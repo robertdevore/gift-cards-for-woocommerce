@@ -26,7 +26,12 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
+// Include the custom gift cards list table class.
+require_once plugin_dir_path( __FILE__ ) . 'classes/class-gift-cards-list-table.php';
 
+/**
+ * Summary of WC_Gift_Cards
+ */
 class WC_Gift_Cards {
 
     /**
@@ -267,7 +272,7 @@ class WC_Gift_Cards {
             __( 'Gift Cards', 'gift-cards-for-woocommerce' ),
             __( 'Gift Cards', 'gift-cards-for-woocommerce' ),
             'manage_woocommerce',
-            'wc-gift-cards',
+            'gift-cards-free',
             [ $this, 'display_admin_page' ]
         );
     }
@@ -278,38 +283,76 @@ class WC_Gift_Cards {
      * @return void
      */
     public function display_admin_page() {
+        $active_tab = isset( $_GET['tab'] ) ? sanitize_text_field( $_GET['tab'] ) : 'gift_cards';
         ?>
         <div class="wrap">
-            <h1><?php esc_html_e( 'Issue New Gift Card', 'gift-cards-for-woocommerce' ); ?></h1>
-            <form method="post" action="">
-                <?php wp_nonce_field( 'issue_gift_card', 'issue_gift_card_nonce' ); ?>
-                
-                <table class="form-table">
-                    <tr>
-                        <th><label for="balance"><?php esc_html_e( 'Gift Card Balance', 'gift-cards-for-woocommerce' ); ?></label></th>
-                        <td><input type="number" name="balance" id="balance" required min="0.01" step="0.01"></td>
-                    </tr>
-                    <tr>
-                        <th><label for="recipient_email"><?php esc_html_e( 'Recipient Email', 'gift-cards-for-woocommerce' ); ?></label></th>
-                        <td><input type="email" name="recipient_email" id="recipient_email" required></td>
-                    </tr>
-                    <tr>
-                        <th><label for="expiration_date"><?php esc_html_e( 'Expiration Date', 'gift-cards-for-woocommerce' ); ?></label></th>
-                        <td><input type="date" name="expiration_date" id="expiration_date"></td>
-                    </tr>
-                    <tr>
-                        <th><label for="message"><?php esc_html_e( 'Personal Message', 'gift-cards-for-woocommerce' ); ?></label></th>
-                        <td><textarea name="message" id="message" rows="4"></textarea></td>
-                    </tr>
-                </table>
+            <h1><?php esc_html_e( 'Gift Cards', 'gift-cards-for-woocommerce' ); ?></h1>
+            <h2 class="nav-tab-wrapper">
+                <a href="?page=gift-cards-free&tab=gift_cards" class="nav-tab <?php echo $active_tab == 'gift_cards' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Gift Cards', 'gift-cards-for-woocommerce' ); ?></a>
+                <a href="?page=gift-cards-free&tab=activity" class="nav-tab <?php echo $active_tab == 'activity' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Activity', 'gift-cards-for-woocommerce' ); ?></a>
+                <a href="?page=gift-cards-free&tab=add_card" class="nav-tab <?php echo $active_tab == 'add_card' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Add Card', 'gift-cards-for-woocommerce' ); ?></a>
+            </h2>
+            <?php
+    
+            // Display content based on the active tab
+            switch ( $active_tab ) {
+                case 'gift_cards':
+                    $this->display_gift_cards_table();
+                    break;
+                case 'activity':
+                    echo '<p>' . esc_html__( 'Coming soon', 'gift-cards-for-woocommerce' ) . '</p>';
+                    break;
+                case 'add_card':
+                    $this->display_add_card_form();
+                    break;
+            }
+    
+        echo '</div>';
+    }
 
-                <p class="submit"><input type="submit" name="issue_gift_card" id="issue_gift_card" class="button button-primary" value="<?php esc_attr_e( 'Issue Gift Card', 'gift-cards-for-woocommerce' ); ?>"></p>
-            </form>
-        </div>
+    public function display_gift_cards_table() {
+        $gift_cards_table = new Gift_Cards_List_Table();
+        $gift_cards_table->prepare_items();
+        ?>
+        <form method="post">
+            <?php
+            $gift_cards_table->display();
+            ?>
+        </form>
         <?php
+    }
 
-        // Process the form submission
+    public function display_add_card_form() {
+        // Process the form submission.
         $this->process_gift_card_form();
+
+        ?>
+        <h2><?php esc_html_e( 'Issue New Gift Card', 'gift-cards-for-woocommerce' ); ?></h2>
+        <form method="post" action="">
+            <?php wp_nonce_field( 'issue_gift_card', 'issue_gift_card_nonce' ); ?>
+
+            <table class="form-table">
+                <tr>
+                    <th><label for="balance"><?php esc_html_e( 'Gift Card Balance', 'gift-cards-for-woocommerce' ); ?></label></th>
+                    <td><input type="number" name="balance" id="balance" required min="0.01" step="0.01"></td>
+                </tr>
+                <tr>
+                    <th><label for="recipient_email"><?php esc_html_e( 'Recipient Email', 'gift-cards-for-woocommerce' ); ?></label></th>
+                    <td><input type="email" name="recipient_email" id="recipient_email" required></td>
+                </tr>
+                <tr>
+                    <th><label for="expiration_date"><?php esc_html_e( 'Expiration Date', 'gift-cards-for-woocommerce' ); ?></label></th>
+                    <td><input type="date" name="expiration_date" id="expiration_date"></td>
+                </tr>
+                <tr>
+                    <th><label for="message"><?php esc_html_e( 'Personal Message', 'gift-cards-for-woocommerce' ); ?></label></th>
+                    <td><textarea name="message" id="message" rows="4"></textarea></td>
+                </tr>
+            </table>
+
+            <p class="submit"><input type="submit" name="issue_gift_card" id="issue_gift_card" class="button button-primary" value="<?php esc_attr_e( 'Issue Gift Card', 'gift-cards-for-woocommerce' ); ?>"></p>
+        </form>
+        <?php
     }
 
     /**
