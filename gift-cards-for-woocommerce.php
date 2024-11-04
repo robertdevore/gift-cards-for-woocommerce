@@ -677,6 +677,7 @@ class WC_Gift_Cards {
         woocommerce_form_field( 'gift_card_delivery_date', [
             'type'  => 'date',
             'label' => __( 'Delivery Date', 'gift-cards-for-woocommerce' ),
+            'value' => date( 'Y-m-d' ),
         ] );
     
         echo '</div>';
@@ -993,7 +994,7 @@ class WC_Gift_Cards {
             // Display the checkbox with a custom CSS class
             ?>
             <div class="gift-card-application" style="background-color: #f0f8ff; padding: 15px; border: 1px solid #dcdcdc; margin-bottom: 20px;">
-                <p class="form-row">
+                <p class="form-row" style="margin:0;padding:0;">
                     <label style="font-weight: bold;">
                         <input type="checkbox" id="apply_gift_card_balance" name="apply_gift_card_balance" value="1" <?php echo $is_checked; ?> style="margin-right: 10px;">
                         <?php printf( esc_html__( 'Apply Gift Card Balance (%s)', 'gift-cards-for-woocommerce' ), wc_price( $total_balance ) ); ?>
