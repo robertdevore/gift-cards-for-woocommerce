@@ -644,10 +644,10 @@ class WC_Gift_Cards {
     
         // Gift Card Type
         woocommerce_form_field( 'gift_card_type', [
-            'type'    => 'select',
-            'label'   => __( 'Gift Card Type', 'gift-cards-for-woocommerce' ),
+            'type'     => 'select',
+            'label'    => __( 'Gift Card Type', 'gift-cards-for-woocommerce' ),
             'required' => true,
-            'options' => [
+            'options'  => [
                 'digital'  => __( 'Digital', 'gift-cards-for-woocommerce' ),
                 'physical' => __( 'Physical', 'gift-cards-for-woocommerce' ),
             ],
@@ -675,9 +675,13 @@ class WC_Gift_Cards {
     
         // Delivery Date
         woocommerce_form_field( 'gift_card_delivery_date', [
-            'type'  => 'date',
-            'label' => __( 'Delivery Date', 'gift-cards-for-woocommerce' ),
-            'value' => date( 'Y-m-d' ),
+            'type'              => 'date',
+            'label'             => __( 'Delivery Date', 'gift-cards-for-woocommerce' ),
+            'default'           => date( 'Y-m-d', current_time( 'timestamp' ) ),
+            'required'          => true, // Optional: make the field required
+            'custom_attributes' => [
+                'min' => date( 'Y-m-d', current_time( 'timestamp' ) ),
+            ],
         ] );
     
         echo '</div>';
@@ -775,7 +779,7 @@ class WC_Gift_Cards {
         $table_name = $wpdb->prefix . 'gift_cards';
 
         // Query for gift cards with today's delivery date
-        $today = date( 'Y-m-d' );
+        $today = current_time( 'Y-m-d' );
         $gift_cards = $wpdb->get_results( $wpdb->prepare(
             "SELECT * FROM $table_name WHERE delivery_date = %s AND gift_card_type = %s",
             $today, 'digital'
@@ -1124,7 +1128,7 @@ class WC_Gift_Cards {
     
         // Set the headers for CSV download
         header( 'Content-Type: text/csv; charset=utf-8' );
-        header( 'Content-Disposition: attachment; filename=gift-cards-' . date( 'Y-m-d' ) . '.csv' );
+        header( 'Content-Disposition: attachment; filename=gift-cards-' . current_time( 'Y-m-d' ) . '.csv' );
     
         // Open the output stream
         $output = fopen( 'php://output', 'w' );
