@@ -29,6 +29,9 @@ if ( ! defined( 'WPINC' ) ) {
 // Include the custom gift cards list table class.
 require_once plugin_dir_path( __FILE__ ) . 'classes/class-gift-cards-list-table.php';
 
+// Run plugin_activated from WC_Gift_Cards.
+register_activation_hook( __FILE__, [ 'WC_Gift_Cards', 'plugin_activated' ] );
+
 /**
  * Summary of WC_Gift_Cards
  */
@@ -81,11 +84,23 @@ class WC_Gift_Cards {
         // Add gift card data to order items.
         add_action( 'woocommerce_checkout_create_order_line_item', [ $this, 'add_gift_card_data_to_order_items' ], 10, 4 );
 
+        // Add My Account endpoint.
+        add_action( 'init', [ $this, 'add_my_account_endpoint' ] );
+        add_filter( 'query_vars', [ $this, 'add_query_vars' ] );
+        add_filter( 'woocommerce_account_menu_items', [ $this, 'add_my_account_tab' ] );
+        add_action( 'woocommerce_account_gift-cards_endpoint', [ $this, 'my_account_gift_cards_content' ] );
+        
         // Schedule gift card emails event.
         register_activation_hook( __FILE__, [ $this, 'schedule_gift_card_email_event' ] );
         add_action( 'wc_send_gift_card_emails', [ $this, 'send_scheduled_gift_card_emails' ] );
 
-    
+    }
+
+    public static function plugin_activated() {
+        $instance = new self();
+        $instance->create_gift_card_table();
+        $instance->add_my_account_endpoint();
+        flush_rewrite_rules();
     }
 
     /**
@@ -112,6 +127,7 @@ class WC_Gift_Cards {
             issued_date DATETIME DEFAULT CURRENT_TIMESTAMP,
             delivery_date DATE NULL,
             gift_card_type VARCHAR(50) NULL,
+            user_id BIGINT(20) UNSIGNED NULL,
             PRIMARY KEY (id)
         ) $charset_collate;";
     
@@ -256,7 +272,7 @@ class WC_Gift_Cards {
                     ],
                     [ '%s', '%f', '%s', '%s', '%s', '%s', '%s', '%s' ]
                 );
-    
+
                 // Prepare gift card object for email
                 $gift_card = (object) [
                     'code'            => $code,
@@ -267,7 +283,19 @@ class WC_Gift_Cards {
                     'gift_card_type'  => $gift_card_data['gift_card_type'],
                     'delivery_date'   => $gift_card_data['delivery_date'],
                 ];
-    
+
+                // Associate the gift card with a user account if the recipient email matches.
+                $user = get_user_by( 'email', $gift_card_data['recipient_email'] );
+                if ( $user ) {
+                    $wpdb->update(
+                        $table_name,
+                        [ 'user_id' => $user->ID ],
+                        [ 'code' => $code ],
+                        [ '%d' ],
+                        [ '%s' ]
+                    );
+                }
+
                 // Send email if delivery date is today or in the past.
                 if ( empty( $gift_card_data['delivery_date'] ) || strtotime( $gift_card_data['delivery_date'] ) <= current_time( 'timestamp' ) ) {
                     $this->send_gift_card_email( $gift_card );
@@ -438,7 +466,19 @@ class WC_Gift_Cards {
                     [ '%s', '%f', '%s', '%s', '%s', '%s', '%s' ]
                 );
 
-                // Display success message
+                // Associate the gift card with a user account if the recipient email matches
+                $user = get_user_by( 'email', $recipient_email );
+                if ( $user ) {
+                    $wpdb->update(
+                        $table_name,
+                        [ 'user_id' => $user->ID ],
+                        [ 'code' => $code ],
+                        [ '%d' ],
+                        [ '%s' ]
+                    );
+                }
+
+                // Display success message.
                 echo '<div class="notice notice-success"><p>' . esc_html__( 'Gift card issued successfully!', 'gift-cards-for-woocommerce' ) . '</p></div>';
             } else {
                 echo '<div class="notice notice-error"><p>' . esc_html__( 'Invalid input. Please make sure all required fields are filled out.', 'gift-cards-for-woocommerce' ) . '</p></div>';
@@ -792,6 +832,102 @@ class WC_Gift_Cards {
         return null;
     }
 
+    /**
+     * Adds a new endpoint for the "Gift Cards" tab in My Account.
+     */
+    public function add_my_account_endpoint() {
+        add_rewrite_endpoint( 'gift-cards', EP_ROOT | EP_PAGES );
+    }
+
+    /**
+     * Adds the 'gift-cards' query var.
+     *
+     * @param array $vars Query vars.
+     * @return array
+     */
+    public function add_query_vars( $vars ) {
+        $vars[] = 'gift-cards';
+        return $vars;
+    }
+
+    /**
+     * Adds the "Gift Cards" tab to the My Account menu.
+     *
+     * @param array $items Existing menu items.
+     * @return array
+     */
+    public function add_my_account_tab( $items ) {
+        // Add the new endpoint after 'dashboard' or wherever you want
+        $new_items = [];
+
+        foreach ( $items as $key => $value ) {
+            $new_items[ $key ] = $value;
+            if ( 'dashboard' === $key ) {
+                $new_items['gift-cards'] = __( 'Gift Cards', 'gift-cards-for-woocommerce' );
+            }
+        }
+
+        return $new_items;
+    }
+
+    /**
+     * Displays the content for the "Gift Cards" tab in My Account.
+     */
+    public function my_account_gift_cards_content() {
+        $user_id = get_current_user_id();
+
+        if ( ! $user_id ) {
+            echo '<p>' . esc_html__( 'You need to be logged in to view your gift cards.', 'gift-cards-for-woocommerce' ) . '</p>';
+            return;
+        }
+
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'gift_cards';
+
+        // Get active gift cards associated with the user
+        $gift_cards = $wpdb->get_results( $wpdb->prepare(
+            "SELECT * FROM $table_name WHERE user_id = %d AND balance > 0", $user_id
+        ), ARRAY_A );
+
+        if ( empty( $gift_cards ) ) {
+            echo '<p>' . esc_html__( 'You have no active gift cards.', 'gift-cards-for-woocommerce' ) . '</p>';
+            return;
+        }
+
+        // Calculate total balance
+        $total_balance = 0;
+        foreach ( $gift_cards as $gift_card ) {
+            $total_balance += $gift_card['balance'];
+        }
+
+        // Display total balance
+        echo '<h2>' . esc_html__( 'Your Gift Card Balance', 'gift-cards-for-woocommerce' ) . '</h2>';
+        echo '<p>' . sprintf( esc_html__( 'Total Balance: %s', 'gift-cards-for-woocommerce' ), wc_price( $total_balance ) ) . '</p>';
+
+        // Display table of gift cards
+        echo '<h2>' . esc_html__( 'Active Gift Cards', 'gift-cards-for-woocommerce' ) . '</h2>';
+        echo '<table class="woocommerce-orders-table woocommerce-MyAccount-gift-cards shop_table shop_table_responsive my_account_orders account-gift-cards-table">';
+        echo '<thead><tr>';
+        echo '<th>' . esc_html__( 'Code', 'gift-cards-for-woocommerce' ) . '</th>';
+        echo '<th>' . esc_html__( 'Balance', 'gift-cards-for-woocommerce' ) . '</th>';
+        echo '<th>' . esc_html__( 'Expiration Date', 'gift-cards-for-woocommerce' ) . '</th>';
+        echo '</tr></thead>';
+        echo '<tbody>';
+        foreach ( $gift_cards as $gift_card ) {
+            echo '<tr>';
+            echo '<td>' . esc_html( $gift_card['code'] ) . '</td>';
+            echo '<td>' . wc_price( $gift_card['balance'] ) . '</td>';
+            echo '<td>' . ( ! empty( $gift_card['expiration_date'] ) ? date_i18n( get_option( 'date_format' ), strtotime( $gift_card['expiration_date'] ) ) : esc_html__( 'No Expiration', 'gift-cards-for-woocommerce' ) ) . '</td>';
+            echo '</tr>';
+        }
+        echo '</tbody></table>';
+    }
+
+    public function flush_rewrite_rules() {
+        $this->add_my_account_endpoint();
+        flush_rewrite_rules();
+    }
+    
 }
 
 new WC_Gift_Cards();
