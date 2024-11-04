@@ -65,12 +65,14 @@ class WC_Gift_Cards {
         add_action( 'woocommerce_before_add_to_cart_button', [ $this, 'display_gift_card_fields_on_product' ] );
         add_action( 'woocommerce_process_product_meta_variable', [ $this, 'generate_gift_card_variations' ] );
 
-        // Enqueue frontend scripts.
+        // Enqueue the plugin scripts.
         add_action( 'wp_enqueue_scripts', [ $this, 'enqueue_scripts' ] );
+        add_action( 'admin_enqueue_scripts', [ $this, 'admin_enqueue_scripts' ] );
 
-        // AJAX for validating and applying gift card.
+        // AJAX for the plugin.
         add_action( 'wp_ajax_apply_gift_card', [ $this, 'apply_gift_card_ajax' ] );
         add_action( 'wp_ajax_nopriv_apply_gift_card', [ $this, 'apply_gift_card_ajax' ] );
+        add_action( 'wp_ajax_delete_gift_card', [ $this, 'delete_gift_card_ajax' ] );
 
         // Add gift card data to cart.
         add_filter( 'woocommerce_add_cart_item_data', [ $this, 'add_gift_card_data_to_cart' ], 10, 2 );
@@ -83,6 +85,7 @@ class WC_Gift_Cards {
         register_activation_hook( __FILE__, [ $this, 'schedule_gift_card_email_event' ] );
         add_action( 'wc_send_gift_card_emails', [ $this, 'send_scheduled_gift_card_emails' ] );
 
+    
     }
 
     /**
@@ -114,6 +117,52 @@ class WC_Gift_Cards {
     
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         dbDelta( $sql );
+    }
+
+    public function admin_enqueue_scripts( $hook_suffix ) {
+        if ( 'woocommerce_page_gift-cards-free' !== $hook_suffix ) {
+            return;
+        }
+
+        wp_enqueue_script(
+            'gift-cards-admin',
+            plugins_url( 'assets/gift-cards-admin.js', __FILE__ ),
+            [ 'jquery' ],
+            '1.0',
+            true
+        );
+
+        wp_localize_script( 'gift-cards-admin', 'gift_cards_ajax', [
+            'ajax_url'        => admin_url( 'admin-ajax.php' ),
+            'confirm_message' => __( 'Are you sure you want to delete this gift card?', 'gift-cards-for-woocommerce' ),
+            'error_message'   => __( 'An error occurred. Please try again.', 'gift-cards-for-woocommerce' ),
+        ] );
+        
+    }
+
+    public function delete_gift_card_ajax() {
+        check_ajax_referer( 'delete_gift_card_nonce', 'nonce' );
+
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( __( 'You do not have permission to perform this action.', 'gift-cards-for-woocommerce' ) );
+        }
+
+        $code = isset( $_POST['code'] ) ? sanitize_text_field( $_POST['code'] ) : '';
+
+        if ( empty( $code ) ) {
+            wp_send_json_error( __( 'Invalid gift card code.', 'gift-cards-for-woocommerce' ) );
+        }
+
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'gift_cards';
+
+        $deleted = $wpdb->delete( $table_name, [ 'code' => $code ], [ '%s' ] );
+
+        if ( $deleted ) {
+            wp_send_json_success( __( 'Gift card deleted successfully.', 'gift-cards-for-woocommerce' ) );
+        } else {
+            wp_send_json_error( __( 'Failed to delete gift card.', 'gift-cards-for-woocommerce' ) );
+        }
     }
     
     /**

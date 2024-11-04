@@ -24,6 +24,7 @@ class Gift_Cards_List_Table extends WP_List_Table {
             'recipient_email' => __( 'Recipient Email', 'gift-cards-for-woocommerce' ),
             'issued_date'     => __( 'Issued Date', 'gift-cards-for-woocommerce' ),
             'expiration_date' => __( 'Expiration Date', 'gift-cards-for-woocommerce' ),
+            'actions'         => __( 'Actions', 'gift-cards-for-woocommerce' ), // New column
         ];
         return $columns;
     }
@@ -77,6 +78,19 @@ class Gift_Cards_List_Table extends WP_List_Table {
                 return print_r( $item, true ); // Show the whole array for troubleshooting purposes
         }
     }
+
+    protected function column_actions( $item ) {
+        $delete_nonce = wp_create_nonce( 'delete_gift_card_nonce' );
+        $code = esc_attr( $item['code'] );
+        
+        $actions = sprintf(
+            '<button class="button delete-gift-card" data-code="%s" data-nonce="%s"><span class="dashicons dashicons-trash"></span></button>',
+            $code,
+            $delete_nonce
+        );
+        
+        return $actions;
+    }    
 
     /**
      * Optional. If you need to render specific columns differently, you can define methods like this:
