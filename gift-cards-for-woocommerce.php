@@ -99,6 +99,8 @@ class WC_Gift_Cards {
         register_activation_hook( __FILE__, [ $this, 'schedule_gift_card_email_event' ] );
         add_action( 'wc_send_gift_card_emails', [ $this, 'send_scheduled_gift_card_emails' ] );
 
+        // Export CSV action.
+        add_action( 'admin_init', [ $this, 'handle_export_action' ] );
     }
 
     public static function plugin_activated() {
@@ -147,7 +149,7 @@ class WC_Gift_Cards {
 
         wp_enqueue_script(
             'gift-cards-admin',
-            plugins_url( 'assets/gift-cards-admin.js', __FILE__ ),
+            plugins_url( 'assets/js/gift-cards-admin.js', __FILE__ ),
             [ 'jquery' ],
             '1.0',
             true
@@ -368,7 +370,15 @@ class WC_Gift_Cards {
         $active_tab = isset( $_GET['tab'] ) ? sanitize_text_field( $_GET['tab'] ) : 'gift_cards';
         ?>
         <div class="wrap">
-            <h1><?php esc_html_e( 'Gift Cards', 'gift-cards-for-woocommerce' ); ?></h1>
+            <h1>
+                <?php esc_html_e( 'Gift Cards', 'gift-cards-for-woocommerce' ); ?>
+    
+                <?php if ( 'gift_cards' === $active_tab ) : ?>
+                    <a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=gift-cards-free&action=export_csv' ), 'export_gift_cards' ) ); ?>" class="page-title-action">
+                        <?php esc_html_e( 'Export CSV', 'gift-cards-for-woocommerce' ); ?>
+                    </a>
+                <?php endif; ?>
+            </h1>
             <h2 class="nav-tab-wrapper">
                 <a href="?page=gift-cards-free&tab=gift_cards" class="nav-tab <?php echo $active_tab == 'gift_cards' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Gift Cards', 'gift-cards-for-woocommerce' ); ?></a>
                 <a href="?page=gift-cards-free&tab=activity" class="nav-tab <?php echo $active_tab == 'activity' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Activity', 'gift-cards-for-woocommerce' ); ?></a>
@@ -390,8 +400,7 @@ class WC_Gift_Cards {
             }
     
         echo '</div>';
-    }
-
+    }    
     public function display_gift_cards_table() {
         $gift_cards_table = new Gift_Cards_List_Table();
         $gift_cards_table->prepare_items();
@@ -500,14 +509,30 @@ class WC_Gift_Cards {
         if ( is_checkout() ) {
             wp_enqueue_script(
                 'wc-gift-card-checkout',
-                plugins_url( 'assets/wc-gift-card-checkout.js', __FILE__ ),
+                plugins_url( 'assets/js/wc-gift-card-checkout.js', __FILE__ ),
                 [ 'jquery', 'wc-checkout' ],
                 '1.0',
                 true
             );
+            wp_enqueue_style(
+                'wc-gift-card-styles',
+                plugins_url( 'assets/css/gift-cards.css', __FILE__ ),
+                [],
+                '1.0'
+            );
+        }
+
+        // Enqueue styles on the product page
+        if ( is_product() ) {
+            wp_enqueue_style(
+                'wc-gift-card-product-styles',
+                plugins_url( 'assets/css/gift-cards.css', __FILE__ ),
+                [],
+                '1.0'
+            );
         }
     }
-    
+        
     /**
      * Applies the gift card discount at checkout if a valid code is entered.
      *
@@ -618,31 +643,45 @@ class WC_Gift_Cards {
         echo '<div class="gift-card-fields">';
     
         // Gift Card Type
-        echo '<p><label for="gift_card_type">' . esc_html__( 'Gift Card Type', 'gift-cards-for-woocommerce' ) . '</label>';
-        echo '<select name="gift_card_type" id="gift_card_type" required>';
-        echo '<option value="digital">' . esc_html__( 'Digital', 'gift-cards-for-woocommerce' ) . '</option>';
-        echo '<option value="physical">' . esc_html__( 'Physical', 'gift-cards-for-woocommerce' ) . '</option>';
-        echo '</select></p>';
+        woocommerce_form_field( 'gift_card_type', [
+            'type'    => 'select',
+            'label'   => __( 'Gift Card Type', 'gift-cards-for-woocommerce' ),
+            'required' => true,
+            'options' => [
+                'digital'  => __( 'Digital', 'gift-cards-for-woocommerce' ),
+                'physical' => __( 'Physical', 'gift-cards-for-woocommerce' ),
+            ],
+        ] );
     
         // To (email)
-        echo '<p><label for="gift_card_to">' . esc_html__( 'To (Email)', 'gift-cards-for-woocommerce' ) . '</label>';
-        echo '<input type="email" name="gift_card_to" id="gift_card_to" required></p>';
+        woocommerce_form_field( 'gift_card_to', [
+            'type'     => 'email',
+            'label'    => __( 'To (Email)', 'gift-cards-for-woocommerce' ),
+            'required' => true,
+        ] );
     
         // From (name)
-        echo '<p><label for="gift_card_from">' . esc_html__( 'From (Name)', 'gift-cards-for-woocommerce' ) . '</label>';
-        echo '<input type="text" name="gift_card_from" id="gift_card_from" required></p>';
+        woocommerce_form_field( 'gift_card_from', [
+            'type'     => 'text',
+            'label'    => __( 'From (Name)', 'gift-cards-for-woocommerce' ),
+            'required' => true,
+        ] );
     
         // Message
-        echo '<p><label for="gift_card_message">' . esc_html__( 'Message', 'gift-cards-for-woocommerce' ) . '</label>';
-        echo '<textarea name="gift_card_message" id="gift_card_message"></textarea></p>';
+        woocommerce_form_field( 'gift_card_message', [
+            'type'  => 'textarea',
+            'label' => __( 'Message', 'gift-cards-for-woocommerce' ),
+        ] );
     
         // Delivery Date
-        echo '<p><label for="gift_card_delivery_date">' . esc_html__( 'Delivery Date', 'gift-cards-for-woocommerce' ) . '</label>';
-        echo '<input type="date" name="gift_card_delivery_date" id="gift_card_delivery_date"></p>';
+        woocommerce_form_field( 'gift_card_delivery_date', [
+            'type'  => 'date',
+            'label' => __( 'Delivery Date', 'gift-cards-for-woocommerce' ),
+        ] );
     
         echo '</div>';
     }
-    
+        
     /**
      * Adds gift card data to the cart item.
      *
@@ -951,19 +990,19 @@ class WC_Gift_Cards {
             // Get the current state of the checkbox from the session
             $is_checked = WC()->session->get( 'apply_gift_card_balance' ) ? 'checked' : '';
     
-            // Display the checkbox
+            // Display the checkbox with a custom CSS class
             ?>
-            <div class="gift-card-application">
+            <div class="gift-card-application" style="background-color: #f0f8ff; padding: 15px; border: 1px solid #dcdcdc; margin-bottom: 20px;">
                 <p class="form-row">
-                    <label>
-                        <input type="checkbox" id="apply_gift_card_balance" name="apply_gift_card_balance" value="1" <?php echo $is_checked; ?>>
+                    <label style="font-weight: bold;">
+                        <input type="checkbox" id="apply_gift_card_balance" name="apply_gift_card_balance" value="1" <?php echo $is_checked; ?> style="margin-right: 10px;">
                         <?php printf( esc_html__( 'Apply Gift Card Balance (%s)', 'gift-cards-for-woocommerce' ), wc_price( $total_balance ) ); ?>
                     </label>
                 </p>
             </div>
             <?php
         }
-    }
+    }    
         
     /**
      * Updates the session with the gift card application status.
@@ -1061,7 +1100,73 @@ class WC_Gift_Cards {
             }
         }
     }
-        
+
+    public function export_gift_cards_csv() {
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_die( __( 'You do not have permission to export gift cards.', 'gift-cards-for-woocommerce' ), '', [ 'response' => 403 ] );
+        }
+    
+        if ( ! check_admin_referer( 'export_gift_cards' ) ) {
+            wp_die( __( 'Invalid request.', 'gift-cards-for-woocommerce' ), '', [ 'response' => 403 ] );
+        }
+    
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'gift_cards';
+    
+        $gift_cards = $wpdb->get_results( "SELECT * FROM $table_name", ARRAY_A );
+    
+        if ( empty( $gift_cards ) ) {
+            // No data to export, redirect back with a notice
+            wp_redirect( add_query_arg( 'export_error', 'no_data', admin_url( 'admin.php?page=gift-cards-free' ) ) );
+            exit;
+        }
+    
+        // Set the headers for CSV download
+        header( 'Content-Type: text/csv; charset=utf-8' );
+        header( 'Content-Disposition: attachment; filename=gift-cards-' . date( 'Y-m-d' ) . '.csv' );
+    
+        // Open the output stream
+        $output = fopen( 'php://output', 'w' );
+    
+        // Define the column headings with translations
+        $headers = array(
+            'id'              => __( 'ID', 'gift-cards-for-woocommerce' ),
+            'code'            => __( 'Code', 'gift-cards-for-woocommerce' ),
+            'balance'         => __( 'Balance', 'gift-cards-for-woocommerce' ),
+            'expiration_date' => __( 'Expiration Date', 'gift-cards-for-woocommerce' ),
+            'sender_email'    => __( 'Sender Email', 'gift-cards-for-woocommerce' ),
+            'recipient_email' => __( 'Recipient Email', 'gift-cards-for-woocommerce' ),
+            'message'         => __( 'Message', 'gift-cards-for-woocommerce' ),
+            'issued_date'     => __( 'Issued Date', 'gift-cards-for-woocommerce' ),
+            'delivery_date'   => __( 'Delivery Date', 'gift-cards-for-woocommerce' ),
+            'gift_card_type'  => __( 'Gift Card Type', 'gift-cards-for-woocommerce' ),
+            'user_id'         => __( 'User ID', 'gift-cards-for-woocommerce' ),
+        );
+    
+        // Output the column headings
+        fputcsv( $output, $headers );
+    
+        // Loop over the rows and output them
+        foreach ( $gift_cards as $gift_card ) {
+            // Create an array that matches the order of headers
+            $data = array();
+            foreach ( array_keys( $headers ) as $key ) {
+                $data[] = isset( $gift_card[ $key ] ) ? $gift_card[ $key ] : '';
+            }
+            fputcsv( $output, $data );
+        }
+    
+        fclose( $output );
+    
+        exit;
+    }
+    
+    public function handle_export_action() {
+        if ( isset( $_GET['page'] ) && $_GET['page'] === 'gift-cards-free' && isset( $_GET['action'] ) && $_GET['action'] === 'export_csv' ) {
+            $this->export_gift_cards_csv();
+        }
+    }
+
 }
 
 new WC_Gift_Cards();

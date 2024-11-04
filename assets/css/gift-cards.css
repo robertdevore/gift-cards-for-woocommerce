@@ -1,0 +1,16 @@
+/* assets/css/gift-cards.css */
+
+.gift-card-application {
+    background-color: #f0f8ff;
+    padding: 15px;
+    border: 1px solid #dcdcdc;
+    margin-bottom: 20px;
+}
+
+.gift-card-application label {
+    font-weight: bold;
+}
+
+.gift-card-application input[type="checkbox"] {
+    margin-right: 10px;
+}
