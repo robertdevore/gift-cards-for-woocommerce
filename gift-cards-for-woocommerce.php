@@ -26,6 +26,18 @@ if ( ! defined( 'WPINC' ) ) {
     die;
 }
 
+// Ensure WooCommerce is active.
+if ( ! in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins', get_option( 'active_plugins' ) ) ) && ! class_exists( 'WooCommerce' ) ) {
+    add_action( 'admin_notices', 'wc_gift_cards_woocommerce_inactive_notice' );
+    return;
+}
+
+function wc_gift_cards_woocommerce_inactive_notice() {
+    echo '<div class="error"><p>';
+    esc_html_e( 'Gift Cards for WooCommerce® (free) requires WooCommerce to be installed and active.', 'gift-cards-for-woocommerce' );
+    echo '</p></div>';
+}
+
 // Include the custom gift cards list table class.
 require_once plugin_dir_path( __FILE__ ) . 'classes/class-gift-cards-list-table.php';
 
@@ -54,7 +66,6 @@ class WC_Gift_Cards {
         register_activation_hook( __FILE__, [ $this, 'create_gift_card_table' ] );
 
         // Initialize the plugin.
-        add_action( 'init', [ $this, 'register_custom_post_type' ] );
         add_action( 'woocommerce_add_to_cart', [ $this, 'process_gift_card_purchase' ] );
         add_action( 'woocommerce_checkout_process', [ $this, 'apply_gift_card' ] );
         add_action( 'woocommerce_order_status_completed', [ $this, 'update_balance_on_completion' ] );
@@ -101,6 +112,9 @@ class WC_Gift_Cards {
 
         // Export CSV action.
         add_action( 'admin_init', [ $this, 'handle_export_action' ] );
+
+        // Register the email class with WooCommerce.
+        add_filter( 'woocommerce_email_classes', [ $this, 'add_gift_card_email_class' ] );
     }
 
     public static function plugin_activated() {
@@ -128,6 +142,7 @@ class WC_Gift_Cards {
             code VARCHAR(255) NOT NULL UNIQUE,
             balance DECIMAL(10, 2) NOT NULL DEFAULT 0.00,
             expiration_date DATE NULL,
+            sender_name VARCHAR(100) NULL,
             sender_email VARCHAR(100) NULL,
             recipient_email VARCHAR(100) NULL,
             message TEXT NULL,
@@ -187,21 +202,6 @@ class WC_Gift_Cards {
             wp_send_json_error( __( 'Failed to delete gift card.', 'gift-cards-for-woocommerce' ) );
         }
     }
-    
-    /**
-     * Registers a custom post type for Gift Certificates.
-     *
-     * @return void
-     */
-    public function register_custom_post_type() {
-        register_post_type( 'gift_certificate', [
-            'label'        => esc_html__( 'Gift Certificates', 'gift-cards-for-woocommerce' ),
-            'public'       => false,
-            'show_ui'      => true,
-            'supports'     => [ 'title', 'custom-fields' ],
-            'show_in_menu' => 'woocommerce',
-        ] );
-    }
 
     /**
      * Processes the gift card purchase by saving recipient and delivery date in cart item data.
@@ -249,18 +249,18 @@ class WC_Gift_Cards {
             $product = $item->get_product();
             if ( 'yes' === get_post_meta( $product->get_id(), '_is_gift_card', true ) ) {
                 $gift_card_data = [
-                    'gift_card_type'    => $item->get_meta( 'Gift Card Type' ),
-                    'recipient_email'   => $item->get_meta( 'To' ),
-                    'sender_name'       => $item->get_meta( 'From' ),
-                    'message'           => $item->get_meta( 'Message' ),
-                    'delivery_date'     => $item->get_meta( 'Delivery Date' ),
+                    'gift_card_type'    => $item->get_meta( 'gift_card_type' ),
+                    'recipient_email'   => $item->get_meta( 'gift_card_to' ),
+                    'sender_name'       => $item->get_meta( 'gift_card_from' ),
+                    'message'           => $item->get_meta( 'gift_card_message' ),
+                    'delivery_date'     => $item->get_meta( 'gift_card_delivery_date' ),
                     'balance'           => $item->get_total(),
                 ];
-    
-                // Generate unique code
+
+                // Generate unique code.
                 $code = $this->generate_unique_code();
-    
-                // Insert gift card into database
+
+                // Insert gift card into database.
                 global $wpdb;
                 $table_name = $wpdb->prefix . 'gift_cards';
     
@@ -270,6 +270,7 @@ class WC_Gift_Cards {
                         'code'            => $code,
                         'balance'         => $gift_card_data['balance'],
                         'expiration_date' => null,
+                        'sender_name'     => $gift_card_data['sender_name'],
                         'sender_email'    => $order->get_billing_email(),
                         'recipient_email' => $gift_card_data['recipient_email'],
                         'message'         => $gift_card_data['message'],
@@ -277,13 +278,14 @@ class WC_Gift_Cards {
                         'delivery_date'   => $gift_card_data['delivery_date'],
                         'gift_card_type'  => $gift_card_data['gift_card_type'],
                     ],
-                    [ '%s', '%f', '%s', '%s', '%s', '%s', '%s', '%s' ]
+                    [ '%s', '%f', '%s', '%s', '%s', '%s', '%s', '%s', '%s' ]
                 );
 
-                // Prepare gift card object for email
+                // Prepare gift card object for email.
                 $gift_card = (object) [
                     'code'            => $code,
                     'balance'         => $gift_card_data['balance'],
+                    'sender_name'     => $gift_card_data['sender_name'], // Add sender_name here
                     'sender_email'    => $order->get_billing_email(),
                     'recipient_email' => $gift_card_data['recipient_email'],
                     'message'         => $gift_card_data['message'],
@@ -309,7 +311,7 @@ class WC_Gift_Cards {
                 }
             }
         }
-    }    
+    }
 
     /**
      * Checks the balance of a gift card.
@@ -428,6 +430,10 @@ class WC_Gift_Cards {
                     <td><input type="number" name="balance" id="balance" required min="0.01" step="0.01"></td>
                 </tr>
                 <tr>
+                    <th><label for="sender_name"><?php esc_html_e( 'Sender Name', 'gift-cards-for-woocommerce' ); ?></label></th>
+                    <td><input type="text" name="sender_name" id="sender_name" required></td>
+                </tr>
+                <tr>
                     <th><label for="recipient_email"><?php esc_html_e( 'Recipient Email', 'gift-cards-for-woocommerce' ); ?></label></th>
                     <td><input type="email" name="recipient_email" id="recipient_email" required></td>
                 </tr>
@@ -464,6 +470,8 @@ class WC_Gift_Cards {
                 // Generate a unique gift card code
                 $code = $this->generate_unique_code();
 
+                $sender_name = isset( $_POST['sender_name'] ) ? sanitize_text_field( $_POST['sender_name'] ) : '';
+
                 // Insert the gift card into the database
                 $table_name = $wpdb->prefix . 'gift_cards';
                 $wpdb->insert(
@@ -472,12 +480,13 @@ class WC_Gift_Cards {
                         'code'            => $code,
                         'balance'         => $balance,
                         'expiration_date' => $expiration_date,
+                        'sender_name'     => $sender_name,
                         'sender_email'    => wp_get_current_user()->user_email,
                         'recipient_email' => $recipient_email,
                         'message'         => $message,
                         'issued_date'     => current_time( 'mysql' ),
                     ],
-                    [ '%s', '%f', '%s', '%s', '%s', '%s', '%s' ]
+                    [ '%s', '%f', '%s', '%s', '%s', '%s', '%s', '%s' ]
                 );
 
                 // Associate the gift card with a user account if the recipient email matches
@@ -750,13 +759,13 @@ class WC_Gift_Cards {
      */
     public function add_gift_card_data_to_order_items( $item, $cart_item_key, $values, $order ) {
         if ( isset( $values['gift_card_type'] ) ) {
-            $item->add_meta_data( __( 'Gift Card Type', 'gift-cards-for-woocommerce' ), sanitize_text_field( $values['gift_card_type'] ), true );
-            $item->add_meta_data( __( 'To', 'gift-cards-for-woocommerce' ), sanitize_text_field( $values['gift_card_to'] ), true );
-            $item->add_meta_data( __( 'From', 'gift-cards-for-woocommerce' ), sanitize_text_field( $values['gift_card_from'] ), true );
-            $item->add_meta_data( __( 'Message', 'gift-cards-for-woocommerce' ), sanitize_textarea_field( $values['gift_card_message'] ), true );
-            $item->add_meta_data( __( 'Delivery Date', 'gift-cards-for-woocommerce' ), sanitize_text_field( $values['gift_card_delivery_date'] ), true );
+            $item->add_meta_data( 'gift_card_type', sanitize_text_field( $values['gift_card_type'] ), true );
+            $item->add_meta_data( 'gift_card_to', sanitize_text_field( $values['gift_card_to'] ), true );
+            $item->add_meta_data( 'gift_card_from', sanitize_text_field( $values['gift_card_from'] ), true );
+            $item->add_meta_data( 'gift_card_message', sanitize_textarea_field( $values['gift_card_message'] ), true );
+            $item->add_meta_data( 'gift_card_delivery_date', sanitize_text_field( $values['gift_card_delivery_date'] ), true );
         }
-    }
+    }    
     
     /**
      * Schedules the daily event for sending gift card emails.
@@ -797,18 +806,12 @@ class WC_Gift_Cards {
      * @return void
      */
     private function send_gift_card_email( $gift_card ) {
-        $to      = $gift_card->recipient_email;
-        $subject = __( 'You received a gift card!', 'gift-cards-for-woocommerce' );
-        $message = sprintf(
-            __( "Hello! You've received a gift card worth %s from %s.\n\nMessage: %s\n\nRedeem your gift card with code: %s\n\nThank you!", 'gift-cards-for-woocommerce' ),
-            wc_price( $gift_card->balance ),
-            sanitize_text_field( $gift_card->sender_email ),
-            sanitize_textarea_field( $gift_card->message ),
-            sanitize_text_field( $gift_card->code )
-        );
-
-        wp_mail( $to, $subject, $message );
-    }
+        // Ensure that the email classes are initialized.
+        WC()->mailer()->emails;
+    
+        // Trigger the email.
+        do_action( 'wc_gift_card_email_notification', $gift_card );
+    }    
 
     /**
      * Generates gift card variations when the product is marked as a gift card.
@@ -1170,6 +1173,15 @@ class WC_Gift_Cards {
         if ( isset( $_GET['page'] ) && $_GET['page'] === 'gift-cards-free' && isset( $_GET['action'] ) && $_GET['action'] === 'export_csv' ) {
             $this->export_gift_cards_csv();
         }
+    }
+
+    public function add_gift_card_email_class( $email_classes ) {
+        // Include the custom email class.
+        require_once plugin_dir_path( __FILE__ ) . 'classes/class-wc-gift-card-email.php';
+
+        // Add the email class to the list of email classes that WooCommerce loads.
+        $email_classes['WC_Gift_Card_Email'] = new WC_Gift_Card_Email();
+        return $email_classes;
     }
 
 }
