@@ -162,6 +162,14 @@ class WC_Gift_Cards {
             return;
         }
 
+        // Enqueue custom admin styles.
+        wp_enqueue_style(
+            'gift-cards-admin-custom-styles',
+            plugins_url( 'assets/css/gift-cards-admin.css', __FILE__ ),
+            [],
+            '1.0'
+        );
+
         wp_enqueue_script(
             'gift-cards-admin',
             plugins_url( 'assets/js/gift-cards-admin.js', __FILE__ ),
@@ -418,36 +426,45 @@ class WC_Gift_Cards {
     public function display_add_card_form() {
         // Process the form submission.
         $this->process_gift_card_form();
-
         ?>
         <h2><?php esc_html_e( 'Issue New Gift Card', 'gift-cards-for-woocommerce' ); ?></h2>
-        <form method="post" action="">
+        <form method="post" action="" class="wc_gift_card_form">
             <?php wp_nonce_field( 'issue_gift_card', 'issue_gift_card_nonce' ); ?>
-
-            <table class="form-table">
-                <tr>
-                    <th><label for="balance"><?php esc_html_e( 'Gift Card Balance', 'gift-cards-for-woocommerce' ); ?></label></th>
-                    <td><input type="number" name="balance" id="balance" required min="0.01" step="0.01"></td>
-                </tr>
-                <tr>
-                    <th><label for="sender_name"><?php esc_html_e( 'Sender Name', 'gift-cards-for-woocommerce' ); ?></label></th>
-                    <td><input type="text" name="sender_name" id="sender_name" required></td>
-                </tr>
-                <tr>
-                    <th><label for="recipient_email"><?php esc_html_e( 'Recipient Email', 'gift-cards-for-woocommerce' ); ?></label></th>
-                    <td><input type="email" name="recipient_email" id="recipient_email" required></td>
-                </tr>
-                <tr>
-                    <th><label for="expiration_date"><?php esc_html_e( 'Expiration Date', 'gift-cards-for-woocommerce' ); ?></label></th>
-                    <td><input type="date" name="expiration_date" id="expiration_date"></td>
-                </tr>
-                <tr>
-                    <th><label for="message"><?php esc_html_e( 'Personal Message', 'gift-cards-for-woocommerce' ); ?></label></th>
-                    <td><textarea name="message" id="message" rows="4"></textarea></td>
-                </tr>
-            </table>
-
-            <p class="submit"><input type="submit" name="issue_gift_card" id="issue_gift_card" class="button button-primary" value="<?php esc_attr_e( 'Issue Gift Card', 'gift-cards-for-woocommerce' ); ?>"></p>
+            <div class="form-field">
+                <label for="balance"><?php esc_html_e( 'Gift Card Balance', 'gift-cards-for-woocommerce' ); ?></label>
+                <input type="number" name="balance" id="balance" required min="0.01" step="0.01">
+                <span class="description"><?php esc_html_e( 'Enter the balance for the gift card.', 'gift-cards-for-woocommerce' ); ?></span>
+            </div>
+            <div class="form-field">
+                <label for="gift_card_type"><?php esc_html_e( 'Gift Card Type', 'gift-cards-for-woocommerce' ); ?></label>
+                <select name="gift_card_type" id="gift_card_type" required>
+                    <option value="digital"><?php esc_html_e( 'Digital', 'gift-cards-for-woocommerce' ); ?></option>
+                    <option value="physical"><?php esc_html_e( 'Physical', 'gift-cards-for-woocommerce' ); ?></option>
+                </select>
+            </div>
+            <div class="form-field">
+                <label for="sender_name"><?php esc_html_e( 'Sender Name', 'gift-cards-for-woocommerce' ); ?></label>
+                <input type="text" name="sender_name" id="sender_name" required>
+            </div>
+            <div class="form-field">
+                <label for="recipient_email"><?php esc_html_e( 'Recipient Email', 'gift-cards-for-woocommerce' ); ?></label>
+                <input type="email" name="recipient_email" id="recipient_email" required>
+            </div>
+            <div class="form-field">
+                <label for="delivery_date"><?php esc_html_e( 'Delivery Date', 'gift-cards-for-woocommerce' ); ?></label>
+                <input type="date" name="delivery_date" id="delivery_date" value="<?php echo date( 'Y-m-d' ); ?>" required min="<?php echo date( 'Y-m-d' ); ?>">
+            </div>
+            <div class="form-field">
+                <label for="expiration_date"><?php esc_html_e( 'Expiration Date', 'gift-cards-for-woocommerce' ); ?></label>
+                <input type="date" name="expiration_date" id="expiration_date">
+            </div>
+            <div class="form-field">
+                <label for="message"><?php esc_html_e( 'Personal Message', 'gift-cards-for-woocommerce' ); ?></label>
+                <textarea name="message" id="message" rows="4" placeholder="<?php esc_attr_e( 'Enter your message here...', 'gift-cards-for-woocommerce' ); ?>"></textarea>
+            </div>
+            <p class="submit">
+                <input type="submit" name="issue_gift_card" id="issue_gift_card" class="button button-primary" value="<?php esc_attr_e( 'Issue Gift Card', 'gift-cards-for-woocommerce' ); ?>">
+            </p>
         </form>
         <?php
     }
@@ -462,32 +479,41 @@ class WC_Gift_Cards {
             global $wpdb;
 
             $balance         = isset( $_POST['balance'] ) ? floatval( $_POST['balance'] ) : 0.00;
+            $gift_card_type  = isset( $_POST['gift_card_type'] ) ? sanitize_text_field( $_POST['gift_card_type'] ) : 'digital';
+            $sender_name     = isset( $_POST['sender_name'] ) ? sanitize_text_field( $_POST['sender_name'] ) : '';
             $recipient_email = isset( $_POST['recipient_email'] ) ? sanitize_email( $_POST['recipient_email'] ) : '';
-            $expiration_date = isset( $_POST['expiration_date'] ) ? sanitize_text_field( $_POST['expiration_date'] ) : null;
+            $delivery_date   = isset( $_POST['delivery_date'] ) ? sanitize_text_field( $_POST['delivery_date'] ) : date( 'Y-m-d' );
+            $expiration_date = ! empty( $_POST['expiration_date'] ) ? sanitize_text_field( $_POST['expiration_date'] ) : null;
             $message         = isset( $_POST['message'] ) ? sanitize_textarea_field( $_POST['message'] ) : '';
 
             if ( $balance > 0 && is_email( $recipient_email ) ) {
                 // Generate a unique gift card code
                 $code = $this->generate_unique_code();
 
-                $sender_name = isset( $_POST['sender_name'] ) ? sanitize_text_field( $_POST['sender_name'] ) : '';
+                // Prepare data and formats for insertion
+                $data = [
+                    'code'            => $code,
+                    'balance'         => $balance,
+                    'sender_name'     => $sender_name,
+                    'sender_email'    => wp_get_current_user()->user_email,
+                    'recipient_email' => $recipient_email,
+                    'message'         => $message,
+                    'issued_date'     => current_time( 'mysql' ),
+                    'delivery_date'   => $delivery_date,
+                    'gift_card_type'  => $gift_card_type,
+                ];
+
+                $formats = [ '%s', '%f', '%s', '%s', '%s', '%s', '%s', '%s', '%s' ];
+
+                // Include 'expiration_date' if it's not null
+                if ( ! is_null( $expiration_date ) ) {
+                    $data['expiration_date'] = $expiration_date;
+                    $formats[] = '%s';
+                }
 
                 // Insert the gift card into the database
                 $table_name = $wpdb->prefix . 'gift_cards';
-                $wpdb->insert(
-                    $table_name,
-                    [
-                        'code'            => $code,
-                        'balance'         => $balance,
-                        'expiration_date' => $expiration_date,
-                        'sender_name'     => $sender_name,
-                        'sender_email'    => wp_get_current_user()->user_email,
-                        'recipient_email' => $recipient_email,
-                        'message'         => $message,
-                        'issued_date'     => current_time( 'mysql' ),
-                    ],
-                    [ '%s', '%f', '%s', '%s', '%s', '%s', '%s', '%s' ]
-                );
+                $wpdb->insert( $table_name, $data, $formats );
 
                 // Associate the gift card with a user account if the recipient email matches
                 $user = get_user_by( 'email', $recipient_email );
@@ -499,6 +525,23 @@ class WC_Gift_Cards {
                         [ '%d' ],
                         [ '%s' ]
                     );
+                }
+
+                // Prepare gift card object for email
+                $gift_card = (object) [
+                    'code'            => $code,
+                    'balance'         => $balance,
+                    'sender_name'     => $sender_name,
+                    'sender_email'    => wp_get_current_user()->user_email,
+                    'recipient_email' => $recipient_email,
+                    'message'         => $message,
+                    'gift_card_type'  => $gift_card_type,
+                    'delivery_date'   => $delivery_date,
+                ];
+
+                // Send email if delivery date is today or in the past.
+                if ( empty( $delivery_date ) || strtotime( $delivery_date ) <= current_time( 'timestamp' ) ) {
+                    $this->send_gift_card_email( $gift_card );
                 }
 
                 // Display success message.
@@ -962,7 +1005,15 @@ class WC_Gift_Cards {
             echo '<tr>';
             echo '<td>' . esc_html( $gift_card['code'] ) . '</td>';
             echo '<td>' . wc_price( $gift_card['balance'] ) . '</td>';
-            echo '<td>' . ( ! empty( $gift_card['expiration_date'] ) ? date_i18n( get_option( 'date_format' ), strtotime( $gift_card['expiration_date'] ) ) : esc_html__( 'No Expiration', 'gift-cards-for-woocommerce' ) ) . '</td>';
+
+            $expiration_date = $gift_card['expiration_date'];
+
+            if ( ! empty( $expiration_date ) && $expiration_date !== '0000-00-00' && strtotime( $expiration_date ) ) {
+                echo '<td>' . date_i18n( get_option( 'date_format' ), strtotime( $expiration_date ) ) . '</td>';
+            } else {
+                echo '<td>' . esc_html__( 'No Expiration', 'gift-cards-for-woocommerce' ) . '</td>';
+            }
+
             echo '</tr>';
         }
         echo '</tbody></table>';

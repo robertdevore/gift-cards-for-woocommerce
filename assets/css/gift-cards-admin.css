@@ -1,0 +1,57 @@
+/* Base styles for the form */
+.wc_gift_card_form .form-field {
+    margin-bottom: 20px;
+    clear: both;
+}
+
+.wc_gift_card_form .form-field label {
+    display: block;
+    font-weight: 600;
+    margin-bottom: 5px;
+}
+
+.wc_gift_card_form .form-field input,
+.wc_gift_card_form .form-field select,
+.wc_gift_card_form .form-field textarea {
+    width: 25em;
+    max-width: 100%;
+    padding: 6px 8px;
+    border: 1px solid #ccc;
+    border-radius: 3px;
+    box-sizing: border-box;
+    font-size: 14px;
+}
+
+.wc_gift_card_form .form-field textarea {
+    height: 100px;
+    resize: vertical;
+}
+
+.wc_gift_card_form .form-field .description {
+    color: #777;
+    font-size: 13px;
+    margin-top: 2px;
+}
+
+.wc_gift_card_form .submit {
+    margin-top: 20px;
+}
+
+.wc_gift_card_form .button-primary {
+    background: #96588a;
+    border-color: #7e3d76;
+    box-shadow: none;
+    color: #fff;
+    text-decoration: none;
+    text-shadow: none;
+}
+
+.wc_gift_card_form .button-primary:hover {
+    background: #7e3d76;
+    border-color: #96588a;
+}
+
+.wc_gift_card_form .button {
+    font-size: 14px;
+    padding: 8px 14px;
+}
