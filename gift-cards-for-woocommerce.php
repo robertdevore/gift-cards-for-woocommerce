@@ -533,8 +533,6 @@ class WC_Gift_Cards {
             }
             // After displaying the gift cards table, add the modal HTML.
             if ( 'gift_cards' === $active_tab ) {
-                $this->display_gift_cards_table();
-
                 // Modal HTML.
                 ?>
                 <div id="gift-card-edit-modal" style="display:none;">
