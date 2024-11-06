@@ -344,8 +344,10 @@ class WC_Gift_Cards {
                 }
 
                 // Send email if delivery date is today or in the past.
-                if ( empty( $gift_card_data['delivery_date'] ) || strtotime( $gift_card_data['delivery_date'] ) <= current_time( 'timestamp' ) ) {
-                    $this->send_gift_card_email( $gift_card );
+                if ( 'digital' === $gift_card_data['gift_card_type'] ) {
+                    if ( empty( $gift_card_data['delivery_date'] ) || strtotime( $gift_card_data['delivery_date'] ) <= current_time( 'timestamp' ) ) {
+                        $this->send_gift_card_email( $gift_card );
+                    }
                 }
             }
         }
@@ -451,6 +453,9 @@ class WC_Gift_Cards {
                 <a href="?page=gift-cards-free&tab=add_card" class="nav-tab <?php echo ( $active_tab === 'add_card' ) ? 'nav-tab-active' : ''; ?>">
                     <?php esc_html_e( 'Add Card', 'gift-cards-for-woocommerce' ); ?>
                 </a>
+                <a href="?page=gift-cards-free&tab=settings" class="nav-tab <?php echo ( $active_tab === 'settings' ) ? 'nav-tab-active' : ''; ?>">
+                    <?php esc_html_e( 'Settings', 'gift-cards-for-woocommerce' ); ?>
+                </a>
             </h2>
             <?php
             // Display content based on the active tab.
@@ -463,6 +468,9 @@ class WC_Gift_Cards {
                     break;
                 case 'add_card':
                     $this->display_add_card_form();
+                    break;
+                case 'settings':
+                    $this->display_settings_page();
                     break;
             }
             // After displaying the gift cards table, add the modal HTML
@@ -583,6 +591,99 @@ class WC_Gift_Cards {
         </form>
         <?php
     }
+
+    /**
+     * Displays the settings page for customizing email templates.
+     *
+     * @return void
+     */
+    public function display_settings_page() {
+        // Process form submission
+        if ( isset( $_POST['save_gift_card_settings'] ) && check_admin_referer( 'save_gift_card_settings', 'gift_card_settings_nonce' ) ) {
+            // Sanitize and save settings
+            $custom_email_image = isset( $_POST['custom_email_image'] ) ? esc_url_raw( $_POST['custom_email_image'] ) : '';
+            $custom_email_text  = isset( $_POST['custom_email_text'] ) ? wp_kses_post( $_POST['custom_email_text'] ) : '';
+
+            update_option( 'gift_card_custom_email_image', $custom_email_image );
+            update_option( 'gift_card_custom_email_text', $custom_email_text );
+
+            echo '<div class="notice notice-success"><p>' . esc_html__( 'Settings saved.', 'gift-cards-for-woocommerce' ) . '</p></div>';
+        }
+
+        // Retrieve existing settings
+        $custom_email_image = get_option( 'gift_card_custom_email_image', '' );
+        $custom_email_text  = get_option( 'gift_card_custom_email_text', '' );
+
+        ?>
+        <h2><?php esc_html_e( 'Gift Card Email Settings', 'gift-cards-for-woocommerce' ); ?></h2>
+        <form method="post" action="">
+            <?php wp_nonce_field( 'save_gift_card_settings', 'gift_card_settings_nonce' ); ?>
+            <table class="form-table">
+                <tr valign="top">
+                    <th scope="row">
+                        <label for="custom_email_image"><?php esc_html_e( 'Custom Email Image', 'gift-cards-for-woocommerce' ); ?></label>
+                    </th>
+                    <td>
+                        <input type="text" name="custom_email_image" id="custom_email_image" value="<?php echo esc_attr( $custom_email_image ); ?>" style="width:300px;" />
+                        <button class="button" id="upload_custom_email_image"><?php esc_html_e( 'Upload Image', 'gift-cards-for-woocommerce' ); ?></button>
+                        <p class="description"><?php esc_html_e( 'Upload an image to use in the gift card emails.', 'gift-cards-for-woocommerce' ); ?></p>
+                    </td>
+                </tr>
+                <tr valign="top">
+                    <th scope="row">
+                        <label for="custom_email_text"><?php esc_html_e( 'Custom Email Text', 'gift-cards-for-woocommerce' ); ?></label>
+                    </th>
+                    <td>
+                        <?php
+                        wp_editor( $custom_email_text, 'custom_email_text', [
+                            'textarea_name' => 'custom_email_text',
+                            'textarea_rows' => 10,
+                        ] );
+                        ?>
+                        <p class="description"><?php esc_html_e( 'Enter custom text to include in the gift card emails.', 'gift-cards-for-woocommerce' ); ?></p>
+                    </td>
+                </tr>
+            </table>
+            <p class="submit">
+                <input type="submit" name="save_gift_card_settings" id="save_gift_card_settings" class="button button-primary" value="<?php esc_attr_e( 'Save Settings', 'gift-cards-for-woocommerce' ); ?>">
+            </p>
+        </form>
+        <?php
+
+        // Enqueue the media uploader script
+        wp_enqueue_media();
+
+        // Add inline script to handle the media uploader
+        ?>
+        <script type="text/javascript">
+        jQuery(document).ready(function($){
+            $('#upload_custom_email_image').on('click', function(e) {
+                e.preventDefault();
+                var image_frame;
+                if (image_frame) {
+                    image_frame.open();
+                }
+                // Define image_frame as wp.media object
+                image_frame = wp.media({
+                    title: '<?php esc_html_e( 'Select Image', 'gift-cards-for-woocommerce' ); ?>',
+                    multiple : false,
+                    library : {
+                        type : 'image',
+                    }
+                });
+
+                image_frame.on('select', function(){
+                    var attachment = image_frame.state().get('selection').first().toJSON();
+                    $('#custom_email_image').val( attachment.url );
+                });
+
+                image_frame.open();
+            });
+        });
+        </script>
+        <?php
+    }
+
 
     /**
      * Processes the gift card form submission and saves the gift card to the database.
