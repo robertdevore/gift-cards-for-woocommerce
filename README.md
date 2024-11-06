@@ -35,7 +35,7 @@ Follow these steps to install and activate the **Gift Cards for WooCommerce®** 
 
 1. **Download the Plugin:**
 
-    - Clone the repository or download the latest release from [GitHub](https://github.com/robertdevore/gift-cards-for-woocommerce-free-plugin/).
+    - Clone the repository or download the latest release from [GitHub](https://github.com/robertdevore/gift-cards-for-woocommerce/).
 2. **Upload to WordPress:**
 
     - Navigate to your WordPress dashboard.
@@ -151,14 +151,14 @@ Once activated, the plugin adds a new submenu under the WooCommerce® menu in yo
 
 ## Contributing
 
-Contributions are always welcome! If you'd like to contribute to the **Gift Cards for WooCommerce®** plugin, please follow these steps:
+Contributions are always welcome! If you'd like to contribute to the free **Gift Cards for WooCommerce®** plugin, please follow these steps:
 
 1. **Fork the Repository:**
 
     - Click the `Fork` button on the top right of the repository page.
 2. **Clone Your Fork:**
     ```
-    git clone https://github.com/your-username/gift-cards-for-woocommerce-free-plugin.git
+    git clone https://github.com/your-username/gift-cards-for-woocommerce.git
     ```
 
 3. **Create a New Branch:**
