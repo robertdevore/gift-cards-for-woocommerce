@@ -113,6 +113,9 @@ class WC_Gift_Cards {
         // Export CSV action.
         add_action( 'admin_init', [ $this, 'handle_export_action' ] );
 
+        // Import CSV action.
+        add_action( 'admin_init', [$this, 'handle_import_action'] );
+
         // Register the email class with WooCommerce.
         add_filter( 'woocommerce_email_classes', [ $this, 'add_gift_card_email_class' ] );
     }
@@ -183,9 +186,25 @@ class WC_Gift_Cards {
             'confirm_message' => __( 'Are you sure you want to delete this gift card?', 'gift-cards-for-woocommerce' ),
             'error_message'   => __( 'An error occurred. Please try again.', 'gift-cards-for-woocommerce' ),
         ] );
-        
+
+        // Inline script to handle the "Import CSV" button click.
+        wp_add_inline_script( 'gift-cards-admin', "
+            document.getElementById('import-csv-button').addEventListener('click', function() {
+                document.getElementById('gift_card_csv').click();
+            });
+        " );
     }
 
+    /**
+     * Handles the AJAX request to delete a gift card.
+     *
+     * This function verifies the nonce, checks user permissions, retrieves the gift card
+     * code from the request, and attempts to delete the corresponding gift card from
+     * the database. It returns a JSON response indicating success or failure.
+     *
+     * @since  1.0.0
+     * @return void Outputs a JSON response on success or error.
+     */
     public function delete_gift_card_ajax() {
         check_ajax_referer( 'delete_gift_card_nonce', 'nonce' );
 
@@ -372,31 +391,58 @@ class WC_Gift_Cards {
     }
 
     /**
-     * Displays the Gift Cards admin page.
+     * Displays the Gift Cards admin page with tabs for different sections.
+     *
+     * This function outputs the main Gift Cards admin page, with options to export/import CSV files,
+     * and navigate between "Gift Cards", "Activity", and "Add Card" sections.
      *
      * @return void
      */
     public function display_admin_page() {
         $active_tab = isset( $_GET['tab'] ) ? sanitize_text_field( $_GET['tab'] ) : 'gift_cards';
+
+        // Check for import status and display messages
+        if ( isset( $_GET['import_success'] ) ) {
+            if ( 'true' === $_GET['import_success'] ) {
+                echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'CSV imported successfully!', 'gift-cards-for-woocommerce' ) . '</p></div>';
+            } else {
+                echo '<div class="notice notice-error is-dismissible"><p>' . esc_html__( 'Error importing CSV. Please check the file format and try again.', 'gift-cards-for-woocommerce' ) . '</p></div>';
+            }
+        }
+
         ?>
         <div class="wrap">
             <h1>
                 <?php esc_html_e( 'Gift Cards', 'gift-cards-for-woocommerce' ); ?>
-    
                 <?php if ( 'gift_cards' === $active_tab ) : ?>
                     <a href="<?php echo esc_url( wp_nonce_url( admin_url( 'admin.php?page=gift-cards-free&action=export_csv' ), 'export_gift_cards' ) ); ?>" class="page-title-action">
                         <?php esc_html_e( 'Export CSV', 'gift-cards-for-woocommerce' ); ?>
                     </a>
+
+                    <button type="button" class="page-title-action" id="import-csv-button">
+                        <?php esc_html_e( 'Import CSV', 'gift-cards-for-woocommerce' ); ?>
+                    </button>
+
+                    <!-- Hidden file input for CSV import -->
+                    <form id="import-csv-form" method="post" enctype="multipart/form-data" style="display: none;">
+                        <?php wp_nonce_field( 'import_gift_cards', 'import_gift_cards_nonce' ); ?>
+                        <input type="file" name="gift_card_csv" id="gift_card_csv" accept=".csv" required onchange="document.getElementById('import-csv-form').submit();">
+                    </form>
                 <?php endif; ?>
             </h1>
             <h2 class="nav-tab-wrapper">
-                <a href="?page=gift-cards-free&tab=gift_cards" class="nav-tab <?php echo $active_tab == 'gift_cards' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Gift Cards', 'gift-cards-for-woocommerce' ); ?></a>
-                <a href="?page=gift-cards-free&tab=activity" class="nav-tab <?php echo $active_tab == 'activity' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Activity', 'gift-cards-for-woocommerce' ); ?></a>
-                <a href="?page=gift-cards-free&tab=add_card" class="nav-tab <?php echo $active_tab == 'add_card' ? 'nav-tab-active' : ''; ?>"><?php esc_html_e( 'Add Card', 'gift-cards-for-woocommerce' ); ?></a>
+                <a href="?page=gift-cards-free&tab=gift_cards" class="nav-tab <?php echo ( $active_tab === 'gift_cards' ) ? 'nav-tab-active' : ''; ?>">
+                    <?php esc_html_e( 'Gift Cards', 'gift-cards-for-woocommerce' ); ?>
+                </a>
+                <a href="?page=gift-cards-free&tab=activity" class="nav-tab <?php echo ( $active_tab === 'activity' ) ? 'nav-tab-active' : ''; ?>">
+                    <?php esc_html_e( 'Activity', 'gift-cards-for-woocommerce' ); ?>
+                </a>
+                <a href="?page=gift-cards-free&tab=add_card" class="nav-tab <?php echo ( $active_tab === 'add_card' ) ? 'nav-tab-active' : ''; ?>">
+                    <?php esc_html_e( 'Add Card', 'gift-cards-for-woocommerce' ); ?>
+                </a>
             </h2>
             <?php
-    
-            // Display content based on the active tab
+            // Display content based on the active tab.
             switch ( $active_tab ) {
                 case 'gift_cards':
                     $this->display_gift_cards_table();
@@ -408,9 +454,18 @@ class WC_Gift_Cards {
                     $this->display_add_card_form();
                     break;
             }
-    
-        echo '</div>';
-    }    
+            ?>
+        </div>
+        <?php
+    }
+
+    /**
+     * Displays the Gift Cards list table within the admin page.
+     *
+     * This function renders the list table, providing an interface to view and manage gift cards.
+     *
+     * @return void
+     */
     public function display_gift_cards_table() {
         $gift_cards_table = new Gift_Cards_List_Table();
         $gift_cards_table->prepare_items();
@@ -1160,6 +1215,18 @@ class WC_Gift_Cards {
         }
     }
 
+    /**
+     * Exports gift cards data to a CSV file for download.
+     *
+     * This function checks user permissions and verifies the nonce for security.
+     * If gift card data is available, it generates a CSV file with relevant columns
+     * such as code, balance, expiration date, and more. The CSV file is then output
+     * for download by the browser. If no data is available, the user is redirected
+     * back to the admin page with an error message.
+     *
+     * @since  1.0.0
+     * @return void Outputs a CSV file for download or redirects with an error message.
+     */
     public function export_gift_cards_csv() {
         if ( ! current_user_can( 'manage_woocommerce' ) ) {
             wp_die( __( 'You do not have permission to export gift cards.', 'gift-cards-for-woocommerce' ), '', [ 'response' => 403 ] );
@@ -1219,13 +1286,117 @@ class WC_Gift_Cards {
     
         exit;
     }
-    
+
+    /**
+     * Handles the import of gift card data from a CSV file.
+     *
+     * Validates permissions, nonce, and the uploaded CSV file.
+     * Parses each row in the CSV, sanitizes data, and inserts it into the database.
+     * Redirects to the admin page with success or failure messages based on import results.
+     *
+     * @return void
+     */
+    public function handle_import_action() {
+        // Verify file upload and nonce
+        if ( isset( $_FILES['gift_card_csv'] ) && check_admin_referer( 'import_gift_cards', 'import_gift_cards_nonce' ) ) {
+
+            // Ensure the user has the right permissions
+            if ( ! current_user_can( 'manage_woocommerce' ) ) {
+                wp_die(
+                    esc_html__( 'You do not have permission to import gift cards.', 'gift-cards-for-woocommerce' ),
+                    '',
+                    [ 'response' => 403 ]
+                );
+            }
+
+            // Check that the file is not empty
+            if ( ! empty( $_FILES['gift_card_csv']['tmp_name'] ) ) {
+                $file   = $_FILES['gift_card_csv']['tmp_name'];
+                $handle = fopen( $file, 'r' );
+
+                if ( $handle !== false ) {
+                    global $wpdb;
+                    $table_name = $wpdb->prefix . 'gift_cards';
+
+                    // Skip the header row
+                    fgetcsv( $handle, 1000, ',' );
+
+                    // Flag to track if at least one row is imported successfully
+                    $imported = false;
+
+                    // Process each row in the CSV
+                    while ( ( $data = fgetcsv( $handle, 1000, ',' ) ) !== false ) {
+                        $result = $wpdb->insert(
+                            $table_name,
+                            [
+                                'code'            => sanitize_text_field( $data[0] ),
+                                'balance'         => floatval( $data[1] ),
+                                'expiration_date' => sanitize_text_field( $data[2] ),
+                                'sender_name'     => sanitize_text_field( $data[3] ),
+                                'sender_email'    => sanitize_email( $data[4] ),
+                                'recipient_email' => sanitize_email( $data[5] ),
+                                'message'         => sanitize_textarea_field( $data[6] ),
+                                'issued_date'     => sanitize_text_field( $data[7] ),
+                                'delivery_date'   => sanitize_text_field( $data[8] ),
+                                'gift_card_type'  => sanitize_text_field( $data[9] ),
+                                'user_id'         => intval( $data[10] ),
+                            ],
+                            [
+                                '%s', '%f', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%s', '%d'
+                            ]
+                        );
+
+                        if ( $result ) {
+                            $imported = true;
+                        }
+                    }
+
+                    fclose( $handle );
+
+                    // Redirect with success or failure message
+                    $redirect_url = add_query_arg(
+                        'import_success',
+                        $imported ? 'true' : 'false',
+                        admin_url( 'admin.php?page=gift-cards-free' )
+                    );
+                    wp_redirect( esc_url_raw( $redirect_url ) );
+                    exit;
+                }
+            } else {
+                // File is empty or missing
+                $redirect_url = add_query_arg( 'import_success', 'false', admin_url( 'admin.php?page=gift-cards-free' ) );
+                wp_redirect( esc_url_raw( $redirect_url ) );
+                exit;
+            }
+        }
+    }
+        
+    /**
+     * Handles the export action for gift cards.
+     *
+     * Checks if the current page and action are set to export the gift cards CSV,
+     * then calls the `export_gift_cards_csv()` function to generate and output the CSV file.
+     *
+     * @since  1.0.0
+     * @return void
+     */
     public function handle_export_action() {
         if ( isset( $_GET['page'] ) && $_GET['page'] === 'gift-cards-free' && isset( $_GET['action'] ) && $_GET['action'] === 'export_csv' ) {
             $this->export_gift_cards_csv();
         }
     }
 
+    /**
+     * Adds a custom gift card email class to WooCommerce's email classes.
+     *
+     * Loads the custom gift card email class file and adds it to the array of WooCommerce
+     * email classes, enabling WooCommerce to send gift card-related emails.
+     *
+     * @param array $email_classes Existing WooCommerce email classes.
+     * 
+     * @since  1.0.0
+     * @return array Modified email classes with the custom gift card email class added.
+     */
     public function add_gift_card_email_class( $email_classes ) {
         // Include the custom email class.
         require_once plugin_dir_path( __FILE__ ) . 'classes/class-wc-gift-card-email.php';
