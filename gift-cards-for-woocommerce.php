@@ -807,58 +807,28 @@ class WC_Gift_Cards {
      * @param WC_Cart $cart The WooCommerce cart object.
      * @return void
      */
-    public function apply_gift_card_discount( $cart ) {
-        if ( is_admin() && ! defined( 'DOING_AJAX' ) ) {
-            return;
-        }
-    
-        if ( WC()->session->get( 'apply_gift_card_balance' ) ) {
-            $user_id = get_current_user_id();
-    
-            if ( ! $user_id ) {
-                error_log( 'User not logged in.' );
-                return;
-            }
-    
-            global $wpdb;
-            $table_name = $wpdb->prefix . 'gift_cards';
-    
-            // Get total gift card balance for the user
-            $total_balance = $wpdb->get_var( $wpdb->prepare(
-                "SELECT SUM(balance) FROM $table_name WHERE user_id = %d AND balance > 0", $user_id
-            ) );
-    
-            $total_balance = floatval( $total_balance );
-    
-            error_log( 'Total Gift Card Balance: ' . $total_balance );
-    
-            if ( $total_balance > 0 ) {
-                $cart_total = $cart->get_subtotal();
-    
-                // Exclude shipping and taxes if desired
-                $cart_total = floatval( $cart_total );
-    
-                error_log( 'Cart Total: ' . $cart_total );
-    
-                $discount = min( $total_balance, $cart_total );
-                $discount = floatval( $discount );
-    
-                error_log( 'Discount to Apply: ' . $discount );
-    
-                // Apply the discount
-                $cart->add_fee( __( 'Gift Card Discount', 'gift-cards-for-woocommerce' ), -$discount );
-    
-                // Store the discount amount in the session for later use
-                WC()->session->set( 'gift_card_discount_amount', $discount );
-            } else {
-                error_log( 'No gift card balance available.' );
-            }
-        } else {
-            error_log( 'Gift card not applied or in admin area.' );
-            WC()->session->set( 'gift_card_discount_amount', 0 );
+    public function apply_gift_card_discount($cart) {
+        if (is_admin() && !defined('DOING_AJAX')) return;
+
+        $user_id = get_current_user_id();
+        if (!$user_id) return;
+
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'gift_cards';
+        $total_balance = $wpdb->get_var($wpdb->prepare(
+            "SELECT SUM(balance) FROM $table_name WHERE user_id = %d AND balance > 0", $user_id
+        ));
+
+        $requested_amount = floatval(WC()->session->get('apply_gift_card_balance') ?: $total_balance);
+        $cart_total       = floatval($cart->get_subtotal());
+
+        $discount = min($requested_amount, $total_balance, $cart_total);  // Use the specified amount or limit to available balance/cart total
+        if ($discount > 0) {
+            $cart->add_fee(__('Gift Card Discount', 'gift-cards-for-woocommerce'), -$discount);
+            WC()->session->set('gift_card_discount_amount', $discount);  // Store discount amount for later
         }
     }
-    
+
     /**
      * Saves the applied gift card code and discount to the order meta.
      *
@@ -1246,39 +1216,32 @@ class WC_Gift_Cards {
     public function display_gift_card_checkbox() {
         $user_id = get_current_user_id();
     
-        // Check if the user is logged in and has gift cards
-        if ( ! $user_id ) {
-            return;
-        }
-    
+        if ( !$user_id ) return;
+
         global $wpdb;
         $table_name = $wpdb->prefix . 'gift_cards';
-    
-        // Get total gift card balance for the user
-        $total_balance = $wpdb->get_var( $wpdb->prepare(
+
+        $total_balance = $wpdb->get_var($wpdb->prepare(
             "SELECT SUM(balance) FROM $table_name WHERE user_id = %d AND balance > 0", $user_id
-        ) );
-    
-        $total_balance = floatval( $total_balance );
-    
+        ));
+
+        $total_balance   = floatval($total_balance);
+        $applied_balance = WC()->session->get('apply_gift_card_balance') ?: $total_balance;
+
         if ( $total_balance > 0 ) {
-            // Get the current state of the checkbox from the session
-            $is_checked = WC()->session->get( 'apply_gift_card_balance' ) ? 'checked' : '';
-    
-            // Display the checkbox with a custom CSS class
             ?>
             <div class="gift-card-application" style="background-color: #f0f8ff; padding: 15px; border: 1px solid #dcdcdc; margin-bottom: 20px;">
-                <p class="form-row" style="margin:0;padding:0;">
-                    <label style="font-weight: bold;">
-                        <input type="checkbox" id="apply_gift_card_balance" name="apply_gift_card_balance" value="1" <?php echo $is_checked; ?> style="margin-right: 10px;">
-                        <?php printf( esc_html__( 'Apply Gift Card Balance (%s)', 'gift-cards-for-woocommerce' ), wc_price( $total_balance ) ); ?>
-                    </label>
+                <p style="margin: 0; padding: 0;">
+                    <strong><?php esc_html_e( 'Gift Card Balance:', 'gift-cards-for-woocommerce' ); ?></strong>
+                    <?php printf( __( '%s', 'gift-cards-for-woocommerce' ), wc_price( $total_balance ) ); ?>
+                    <a href="#" id="edit-gift-card-amount" style="margin-left: 10px;"><?php esc_html_e( 'Edit', 'gift-cards-for-woocommerce' ); ?></a>
                 </p>
+                <input type="number" id="gift_card_amount_input" name="gift_card_amount" value="<?php echo esc_attr($applied_balance); ?>" max="<?php echo esc_attr($total_balance); ?>" min="0" style="display: none; width: 100px;">
             </div>
             <?php
         }
-    }    
-        
+    }
+
     /**
      * Updates the session with the gift card application status.
      *
@@ -1286,18 +1249,14 @@ class WC_Gift_Cards {
      */
     public function update_gift_card_session( $posted_data ) {
         parse_str( $posted_data, $output );
-    
-        // Debugging statement
-        error_log( 'Posted Data: ' . print_r( $output, true ) );
-    
-        if ( isset( $output['apply_gift_card_balance'] ) ) {
-            WC()->session->set( 'apply_gift_card_balance', true );
-            error_log( 'apply_gift_card_balance set to true' );
+
+        if (isset($output['gift_card_amount'])) {
+            $amount = floatval($output['gift_card_amount']);
+            WC()->session->set('apply_gift_card_balance', $amount);
         } else {
-            WC()->session->set( 'apply_gift_card_balance', false );
-            error_log( 'apply_gift_card_balance set to false' );
+            WC()->session->set('apply_gift_card_balance', 0);
         }
-    }     
+    }
 
     /**
      * Stores the applied gift card discount in the order meta.
@@ -1323,55 +1282,46 @@ class WC_Gift_Cards {
      *
      * @param int $order_id The ID of the order.
      */
-    public function reduce_gift_card_balance( $order_id ) {
-        $order = wc_get_order( $order_id );
+    public function reduce_gift_card_balance($order_id) {
+        $order = wc_get_order($order_id);
         $user_id = $order->get_user_id();
     
-        if ( ! $user_id ) {
-            return;
-        }
+        if (!$user_id) return;
     
-        $discount_amount = $order->get_meta( '_applied_gift_card_discount' );
-        $discount_amount = floatval( $discount_amount );
+        // Get the actual discount amount applied to the order
+        $discount_amount = $order->get_meta('_applied_gift_card_discount');
+        $discount_amount = floatval($discount_amount);
     
-        if ( $discount_amount > 0 ) {
+        if ($discount_amount > 0) {
             global $wpdb;
             $table_name = $wpdb->prefix . 'gift_cards';
     
-            // Get user's gift cards with balance
-            $gift_cards = $wpdb->get_results( $wpdb->prepare(
+            // Get the user's gift cards with balance, ordered by issued date (first in, first out)
+            $gift_cards = $wpdb->get_results($wpdb->prepare(
                 "SELECT * FROM $table_name WHERE user_id = %d AND balance > 0 ORDER BY issued_date ASC", $user_id
-            ) );
-    
+            ));
+
             $remaining_discount = $discount_amount;
-    
-            foreach ( $gift_cards as $gift_card ) {
-                if ( $remaining_discount <= 0 ) {
-                    break;
-                }
-    
+
+            foreach ($gift_cards as $gift_card) {
+                // Stop if there's no discount left to apply.
+                if ( $remaining_discount <= 0 ) break;
+
                 $gift_card_balance = floatval( $gift_card->balance );
-    
-                if ( $gift_card_balance > 0 ) {
-                    if ( $gift_card_balance >= $remaining_discount ) {
-                        // Deduct remaining_discount from this gift card
-                        $new_balance = $gift_card_balance - $remaining_discount;
-                        $remaining_discount = 0;
-                    } else {
-                        // Use up the whole gift card balance
-                        $new_balance = 0;
-                        $remaining_discount -= $gift_card_balance;
-                    }
-    
-                    // Update the gift card balance in the database
-                    $wpdb->update(
-                        $table_name,
-                        [ 'balance' => $new_balance ],
-                        [ 'id' => $gift_card->id ],
-                        [ '%f' ],
-                        [ '%d' ]
-                    );
-                }
+
+                // Determine how much to deduct from this gift card.
+                $deduction = min($gift_card_balance, $remaining_discount);
+                $new_balance = $gift_card_balance - $deduction;
+                $remaining_discount -= $deduction;
+
+                // Update the gift card balance in the database
+                $wpdb->update(
+                    $table_name,
+                    ['balance' => $new_balance],
+                    ['id' => $gift_card->id],
+                    ['%f'],
+                    ['%d']
+                );
             }
         }
     }
