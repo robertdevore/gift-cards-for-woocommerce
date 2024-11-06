@@ -104,4 +104,77 @@ jQuery(document).ready(function($) {
             });
         }
     });
+
+    let batch_size = 100;  // Define batch size here
+    let offset = 0;        // Start offset
+
+    // Batch Export
+    $('#export_gift_cards_btn').on('click', function() {
+        batchExportGiftCards();
+    });
+
+    function batchExportGiftCards() {
+        $.ajax({
+            url: gift_cards_ajax.ajax_url,
+            method: 'POST',
+            data: {
+                action: 'export_gift_cards_in_batches',
+                offset: offset,
+                batch_size: batch_size,
+                _ajax_nonce: gift_cards_ajax.nonce
+            },
+            success: function(response) {
+                if (response.success && response.data.complete) {
+                    // Trigger file download
+                    window.location.href = response.data.file_url;
+                } else if (response.success) {
+                    offset += batch_size; // Move to the next batch
+                    batchExportGiftCards(); // Recursively call the next batch
+                } else {
+                    alert(response.data.error || 'Error exporting gift cards.');
+                }
+            }
+        });
+    }
+
+    // Batch Import
+    $('#import_gift_cards_btn').on('click', function() {
+        let fileInput = $('#gift_card_csv')[0];
+        if (fileInput.files.length === 0) {
+            alert('Please select a CSV file.');
+            return;
+        }
+
+        let file = fileInput.files[0];
+        offset = 0;
+        batchImportGiftCards(file);
+    });
+
+    function batchImportGiftCards(file) {
+        let formData = new FormData();
+        formData.append('action', 'import_gift_cards_in_batches');
+        formData.append('offset', offset);
+        formData.append('batch_size', batch_size);
+        formData.append('_ajax_nonce', gift_cards_ajax.nonce);
+        formData.append('file', file);
+
+        $.ajax({
+            url: gift_cards_ajax.ajax_url,
+            method: 'POST',
+            data: formData,
+            contentType: false,
+            processData: false,
+            success: function(response) {
+                if (response.success && response.data.complete) {
+                    alert('Import completed successfully.');
+                } else if (response.success) {
+                    offset += batch_size; // Move to the next batch
+                    batchImportGiftCards(file); // Recursively call the next batch
+                } else {
+                    alert(response.data.error || 'Error importing gift cards.');
+                }
+            }
+        });
+    }
+
 });

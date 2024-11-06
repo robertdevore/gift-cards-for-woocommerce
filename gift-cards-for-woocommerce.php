@@ -137,11 +137,13 @@ class WC_Gift_Cards {
         add_action( 'wc_send_gift_card_emails', [ $this, 'send_scheduled_gift_card_emails' ] );
         add_action( 'wc_send_gift_card_expiry_reminders', [ $this, 'send_gift_card_expiry_reminder_emails' ] );
 
-        // Export CSV action.
+        // Export CSV actions.
         add_action( 'admin_init', [ $this, 'handle_export_action' ] );
-
-        // Import CSV action.
+        add_action( 'wp_ajax_export_gift_cards_in_batches', [ $this, 'batch_export_gift_cards' ] );
+        
+        // Import CSV actions.
         add_action( 'admin_init', [$this, 'handle_import_action'] );
+        add_action( 'wp_ajax_import_gift_cards_in_batches', [ $this, 'import_gift_cards_in_batches' ] );
 
         // Register the email class with WooCommerce.
         add_filter( 'woocommerce_email_classes', [ $this, 'add_gift_card_email_class' ] );
@@ -1808,6 +1810,110 @@ class WC_Gift_Cards {
         }
     }
 
+    /**
+     * Exports gift cards data in batches to a CSV file.
+     *
+     * @return void Outputs JSON response indicating batch progress or completion.
+     */
+    public function batch_export_gift_cards() {
+        check_ajax_referer( 'gift_cards_nonce', '_ajax_nonce' );
+
+        // Define offset and batch size from AJAX data
+        $offset     = isset( $_POST['offset'] ) ? intval( $_POST['offset'] ) : 0;
+        $batch_size = isset( $_POST['batch_size'] ) ? intval( $_POST['batch_size'] ) : 100;
+
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'gift_cards';
+
+        // Retrieve a batch of gift card records
+        $gift_cards = $wpdb->get_results( $wpdb->prepare(
+            "SELECT * FROM $table_name LIMIT %d OFFSET %d",
+            $batch_size,
+            $offset
+        ), ARRAY_A );
+
+        // Define CSV file path
+        $file_path = wp_upload_dir()['basedir'] . '/gift-cards-export.csv';
+        $file = fopen( $file_path, $offset === 0 ? 'w' : 'a' );
+
+        // Write gift card data to CSV
+        if ( $offset === 0 ) {
+            fputcsv( $file, array_keys( $gift_cards[0] ) ); // Header row
+        }
+
+        foreach ( $gift_cards as $gift_card ) {
+            fputcsv( $file, $gift_card );
+        }
+        fclose( $file );
+
+        // If this is the last batch, return completion status
+        if ( count( $gift_cards ) < $batch_size ) {
+            wp_send_json_success( [ 'complete' => true, 'file_url' => wp_upload_dir()['baseurl'] . '/gift-cards-export.csv' ] );
+        } else {
+            wp_send_json_success( [ 'complete' => false ] );
+        }
+    }
+
+    /**
+     * Imports gift card data from a CSV file in batches.
+     *
+     * @return void Outputs JSON response indicating batch progress or completion.
+     */
+    public function import_gift_cards_in_batches() {
+        check_ajax_referer( 'gift_cards_nonce', '_ajax_nonce' );
+
+        $offset     = isset( $_POST['offset'] ) ? intval( $_POST['offset'] ) : 0;
+        $batch_size = isset( $_POST['batch_size'] ) ? intval( $_POST['batch_size'] ) : 100;
+
+        if ( ! isset( $_FILES['file'] ) || ! is_uploaded_file( $_FILES['file']['tmp_name'] ) ) {
+            wp_send_json_error( [ 'error' => __( 'File upload error.', 'gift-cards-for-woocommerce' ) ] );
+        }
+
+        $file = fopen( $_FILES['file']['tmp_name'], 'r' );
+        if ( $file === false ) {
+            wp_send_json_error( [ 'error' => __( 'Cannot open uploaded file.', 'gift-cards-for-woocommerce' ) ] );
+        }
+
+        // Skip headers and previous rows
+        if ( $offset > 0 ) {
+            for ( $i = 0; $i < $offset + 1; $i++ ) {
+                fgetcsv( $file );
+            }
+        }
+
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'gift_cards';
+        $rows_imported = 0;
+
+        while ( ( $data = fgetcsv( $file ) ) !== false && $rows_imported < $batch_size ) {
+            $wpdb->insert(
+                $table_name,
+                [
+                    'code'            => sanitize_text_field( $data[0] ),
+                    'balance'         => floatval( $data[1] ),
+                    'expiration_date' => sanitize_text_field( $data[2] ),
+                    'sender_name'     => sanitize_text_field( $data[3] ),
+                    'sender_email'    => sanitize_email( $data[4] ),
+                    'recipient_email' => sanitize_email( $data[5] ),
+                    'message'         => sanitize_textarea_field( $data[6] ),
+                    'issued_date'     => sanitize_text_field( $data[7] ),
+                    'delivery_date'   => sanitize_text_field( $data[8] ),
+                    'gift_card_type'  => sanitize_text_field( $data[9] ),
+                    'user_id'         => intval( $data[10] ),
+                ]
+            );
+            $rows_imported++;
+        }
+
+        fclose( $file );
+
+        // Return completion status
+        if ( $rows_imported < $batch_size ) {
+            wp_send_json_success( [ 'complete' => true ] );
+        } else {
+            wp_send_json_success( [ 'complete' => false ] );
+        }
+    }
 }
 
 new WC_Gift_Cards();
