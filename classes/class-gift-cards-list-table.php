@@ -49,10 +49,11 @@ class Gift_Cards_List_Table extends WP_List_Table {
     }
 
     /**
-     * Prepares the items for display in the table.
+     * Prepares the items for display in the gift cards list table.
      *
      * Retrieves data from the database and sets up pagination, sorting, and filtering.
      *
+     * @since  1.0.0
      * @return void
      */
     public function prepare_items() {
@@ -62,43 +63,34 @@ class Gift_Cards_List_Table extends WP_List_Table {
         $per_page     = apply_filters( 'gift_cards_prepare_items_per_page', 20 );
         $current_page = $this->get_pagenum();
 
-        // Define column headers.
         $columns  = $this->get_columns();
         $hidden   = [];
         $sortable = $this->get_sortable_columns();
 
         $this->_column_headers = [ $columns, $hidden, $sortable ];
 
-        // Get the search parameter.
         $search = isset( $_REQUEST['s'] ) ? wp_unslash( trim( $_REQUEST['s'] ) ) : '';
-
-        // Prepare the WHERE clause.
-        $where = [];
+        $where  = [];
 
         if ( ! empty( $search ) ) {
             $search_like = '%' . $wpdb->esc_like( $search ) . '%';
             $where[]     = $wpdb->prepare( "( code LIKE %s OR recipient_email LIKE %s )", $search_like, $search_like );
         }
 
-        // Handle gift card type filter.
-        $gift_card_type = isset( $_REQUEST['gift_card_type'] ) ? sanitize_text_field( $_REQUEST['gift_card_type'] ) : '';
-        if ( ! empty( $gift_card_type ) ) {
-            $where[] = $wpdb->prepare( 'gift_card_type = %s', $gift_card_type );
-        }
-
-        // Combine the WHERE clauses.
         $where_sql = ! empty( $where ) ? 'WHERE ' . implode( ' AND ', $where ) : '';
 
-        // Handle sorting.
         $allowed_orderby = [ 'code', 'balance', 'recipient_email', 'issued_date', 'expiration_date' ];
         $orderby         = ( ! empty( $_REQUEST['orderby'] ) && in_array( $_REQUEST['orderby'], $allowed_orderby, true ) ) ? $_REQUEST['orderby'] : 'issued_date';
         $order           = ( ! empty( $_REQUEST['order'] ) && in_array( strtolower( $_REQUEST['order'] ), [ 'asc', 'desc' ], true ) ) ? strtoupper( $_REQUEST['order'] ) : 'DESC';
 
-        // Set cache key for query caching.
-        $cache_key   = 'gift_cards_list_' . md5( serialize( [ $current_page, $search, $gift_card_type, $orderby, $order ] ) );
-        $this->items = get_transient( $cache_key );
+        // Bypass cache if updating
+        if ( isset( $_POST['action'] ) && 'update_gift_card' === $_POST['action'] ) {
+            $this->items = false;
+        } else {
+            $cache_key   = 'gift_cards_list_' . md5( serialize( [ $current_page, $search, $orderby, $order ] ) );
+            $this->items = get_transient( $cache_key );
+        }
 
-        // Fetch items if not cached.
         if ( false === $this->items ) {
             $offset = ( $current_page - 1 ) * $per_page;
             $sql    = "SELECT id, code, balance, recipient_email, issued_date, expiration_date FROM $table_name $where_sql ORDER BY $orderby $order LIMIT %d OFFSET %d";
@@ -108,12 +100,11 @@ class Gift_Cards_List_Table extends WP_List_Table {
             set_transient( $cache_key, $this->items, HOUR_IN_SECONDS );
         }
 
-        // Count total items for pagination.
-        $count_cache_key = 'gift_cards_total_count_' . md5( $where_sql );
+        $count_cache_key = 'gift_cards_total_count';
         $total_items     = get_transient( $count_cache_key );
 
         if ( false === $total_items ) {
-            $count_sql = "SELECT COUNT(id) FROM $table_name $where_sql";
+            $count_sql   = "SELECT COUNT(id) FROM $table_name $where_sql";
             $total_items = $wpdb->get_var( $count_sql );
             set_transient( $count_cache_key, $total_items, HOUR_IN_SECONDS );
         }

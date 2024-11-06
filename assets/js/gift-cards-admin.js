@@ -16,7 +16,6 @@ jQuery(document).ready(function($) {
             },
             success: function(response) {
                 if (response.success) {
-                    // Populate the form fields
                     $('#gift-card-code').val(response.data.code);
                     $('#gift-card-balance').val(response.data.balance);
                     $('#gift-card-expiration-date').val(response.data.expiration_date);
@@ -24,7 +23,6 @@ jQuery(document).ready(function($) {
                     $('#gift-card-sender-name').val(response.data.sender_name);
                     $('#gift-card-message').val(response.data.message);
 
-                    // Open the modal with additional options
                     $('#gift-card-edit-modal').dialog({
                         modal: true,
                         width: 500,
@@ -45,7 +43,6 @@ jQuery(document).ready(function($) {
     // Handle form submission
     $('#gift-card-edit-form').on('submit', function(e) {
         e.preventDefault();
-
         var formData = $(this).serialize();
 
         $.ajax({
@@ -54,17 +51,11 @@ jQuery(document).ready(function($) {
             data: formData + '&action=update_gift_card',
             success: function(response) {
                 if (response.success) {
-                    // Replace the form content with the success message
-                    $('#gift-card-edit-form').html('<p class="success-message">' + response.data + '</p>');
-                    // After 1 second, close the modal and reload the page
-                    setTimeout(function() {
-                        $('#gift-card-edit-modal').dialog('close');
-                        location.reload(); // Reload the page to reflect changes
-                    }, 1000); // 1000 milliseconds = 1 second
+                    $('#gift-card-edit-modal').dialog('close');
+                    refreshGiftCardTable();
                 } else {
-                    // Display error message inside the form
                     $('#gift-card-edit-form').prepend('<p class="error-message">' + response.data + '</p>');
-                }                
+                }
             },
             error: function() {
                 alert(gift_cards_ajax.error_message);
@@ -74,12 +65,11 @@ jQuery(document).ready(function($) {
 
     $('.wp-list-table').on('click', '.delete-gift-card', function(e) {
         e.preventDefault();
-
         var button = $(this);
         var code = button.data('code');
         var nonce = button.data('nonce');
 
-        if ( confirm( gift_cards_ajax.confirm_message ) ) {
+        if (confirm(gift_cards_ajax.confirm_message)) {
             $.ajax({
                 url: gift_cards_ajax.ajax_url,
                 type: 'POST',
@@ -88,25 +78,38 @@ jQuery(document).ready(function($) {
                     code: code,
                     nonce: nonce
                 },
-                success: function( response ) {
-                    if ( response.success ) {
-                        // Remove the row from the table
-                        button.closest('tr').fadeOut( 300, function() {
+                success: function(response) {
+                    if (response.success) {
+                        button.closest('tr').fadeOut(300, function() {
                             $(this).remove();
                         });
                     } else {
-                        alert( response.data );
+                        alert(response.data);
                     }
                 },
                 error: function() {
-                    alert( gift_cards_ajax.error_message );
+                    alert(gift_cards_ajax.error_message);
                 }
             });
         }
     });
 
-    let batch_size = 100;  // Define batch size here
-    let offset = 0;        // Start offset
+    function refreshGiftCardTable() {
+        $.ajax({
+            url: window.location.href,
+            type: 'GET',
+            success: function(response) {
+                var newTableBody = $(response).find('.wp-list-table tbody').html();
+                $('.wp-list-table tbody').html(newTableBody);
+            },
+            error: function() {
+                alert('Error refreshing the table.');
+            }
+        });
+    }
+
+    let batch_size = 100;
+    let offset = 0;
 
     // Batch Export
     $('#export_gift_cards_btn').on('click', function() {
@@ -125,11 +128,10 @@ jQuery(document).ready(function($) {
             },
             success: function(response) {
                 if (response.success && response.data.complete) {
-                    // Trigger file download
                     window.location.href = response.data.file_url;
                 } else if (response.success) {
-                    offset += batch_size; // Move to the next batch
-                    batchExportGiftCards(); // Recursively call the next batch
+                    offset += batch_size;
+                    batchExportGiftCards();
                 } else {
                     alert(response.data.error || 'Error exporting gift cards.');
                 }
@@ -168,13 +170,12 @@ jQuery(document).ready(function($) {
                 if (response.success && response.data.complete) {
                     alert('Import completed successfully.');
                 } else if (response.success) {
-                    offset += batch_size; // Move to the next batch
-                    batchImportGiftCards(file); // Recursively call the next batch
+                    offset += batch_size;
+                    batchImportGiftCards(file);
                 } else {
                     alert(response.data.error || 'Error importing gift cards.');
                 }
             }
         });
     }
-
 });
