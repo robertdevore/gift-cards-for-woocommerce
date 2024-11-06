@@ -1,14 +1,25 @@
 jQuery(document).ready(function($) {
-    // Handle Edit button click
+    // Function to reset the modal to its initial state
+    function resetModal() {
+        // Show the form and hide messages
+        $('#gift-card-edit-form').show();
+        $('.message').removeClass('success-message error-message').hide().text('');
+    }
+
+    // Handle the Edit Gift Card button click
     $('.edit-gift-card').on('click', function(e) {
         e.preventDefault();
+
         var code = $(this).data('code');
         var nonce = $(this).data('nonce');
 
-        // Fetch gift card data via AJAX
+        // Reset the modal to initial state
+        resetModal();
+
+        // Populate the modal with existing gift card data via AJAX
         $.ajax({
             url: gift_cards_ajax.ajax_url,
-            method: 'POST',
+            type: 'POST',
             data: {
                 action: 'get_gift_card_data',
                 code: code,
@@ -16,53 +27,102 @@ jQuery(document).ready(function($) {
             },
             success: function(response) {
                 if (response.success) {
-                    $('#gift-card-code').val(response.data.code);
-                    $('#gift-card-balance').val(response.data.balance);
-                    $('#gift-card-expiration-date').val(response.data.expiration_date);
-                    $('#gift-card-recipient-email').val(response.data.recipient_email);
-                    $('#gift-card-sender-name').val(response.data.sender_name);
-                    $('#gift-card-message').val(response.data.message);
+                    var giftCard = response.data;
+                    $('#gift-card-code').val(giftCard.code);
+                    $('#gift-card-balance').val(giftCard.balance);
+                    $('#gift-card-expiration-date').val(giftCard.expiration_date);
+                    $('#gift-card-recipient-email').val(giftCard.recipient_email);
+                    $('#gift-card-sender-name').val(giftCard.sender_name);
+                    $('#gift-card-message').val(giftCard.message);
 
+                    // Open the modal
                     $('#gift-card-edit-modal').dialog({
                         modal: true,
-                        width: 500,
                         title: 'Edit Gift Card',
-                        dialogClass: 'gift-card-dialog',
-                        position: { my: "center", at: "center", of: window }
+                        width: 600,
+                        close: function() {
+                            resetModal();
+                        }
                     });
                 } else {
-                    alert(response.data);
+                    // Display error message inside the modal
+                    $('.message').addClass('error-message').text(response.data).show();
+
+                    // Open the modal to show the error
+                    $('#gift-card-edit-modal').dialog({
+                        modal: true,
+                        title: 'Error',
+                        width: 600,
+                        close: function() {
+                            resetModal();
+                        }
+                    });
                 }
             },
             error: function() {
-                alert(gift_cards_ajax.error_message);
+                // Display generic error message inside the modal
+                $('.message').addClass('error-message').text(gift_cards_ajax.error_message).show();
+
+                // Open the modal to show the error
+                $('#gift-card-edit-modal').dialog({
+                    modal: true,
+                    title: 'Error',
+                    width: 600,
+                    close: function() {
+                        resetModal();
+                    }
+                });
             }
         });
     });
 
-    // Handle form submission
+    // Handle the Save Changes button in the modal
     $('#gift-card-edit-form').on('submit', function(e) {
         e.preventDefault();
-        var formData = $(this).serialize();
+
+        var form = $(this);
+        var submitButton = form.find('button[type="submit"]');
+        submitButton.prop('disabled', true).text('Saving...');
+
+        var formData = form.serialize();
+
+        // Hide previous messages
+        $('.message').removeClass('success-message error-message').hide().text('');
 
         $.ajax({
             url: gift_cards_ajax.ajax_url,
-            method: 'POST',
+            type: 'POST',
             data: formData + '&action=update_gift_card',
             success: function(response) {
+                submitButton.prop('disabled', false).text('Save Changes');
                 if (response.success) {
-                    $('#gift-card-edit-modal').dialog('close');
-                    refreshGiftCardTable();
+                    // Hide the form
+                    $('#gift-card-edit-form').hide();
+
+                    // Display the success message
+                    $('.message').addClass('success-message').text(response.data).show();
+
+                    // Optionally, close the modal after a short delay to allow the user to read the message
+                    setTimeout(function() {
+                        $('#gift-card-edit-modal').dialog('close');
+
+                        // Refresh the gift cards table to reflect the changes
+                        refreshGiftCardTable();
+                    }, 2000); // 2-second delay
                 } else {
-                    $('#gift-card-edit-form').prepend('<p class="error-message">' + response.data + '</p>');
+                    // Display the error message inside the modal
+                    $('.message').addClass('error-message').text(response.data).show();
                 }
             },
             error: function() {
-                alert(gift_cards_ajax.error_message);
+                submitButton.prop('disabled', false).text('Save Changes');
+                // Display generic error message inside the modal
+                $('.message').addClass('error-message').text(gift_cards_ajax.error_message).show();
             }
         });
     });
 
+    // Handle the Delete Gift Card button click
     $('.wp-list-table').on('click', '.delete-gift-card', function(e) {
         e.preventDefault();
         var button = $(this);
@@ -84,7 +144,18 @@ jQuery(document).ready(function($) {
                             $(this).remove();
                         });
                     } else {
-                        alert(response.data);
+                        // Optionally, display the error message in the modal or as a notification
+                        $('.message').addClass('error-message').text(response.data).show();
+
+                        // Optionally, open the modal to show the error
+                        $('#gift-card-edit-modal').dialog({
+                            modal: true,
+                            title: 'Error',
+                            width: 600,
+                            close: function() {
+                                resetModal();
+                            }
+                        });
                     }
                 },
                 error: function() {
@@ -94,6 +165,7 @@ jQuery(document).ready(function($) {
         }
     });
 
+    // Function to refresh the Gift Cards list table
     function refreshGiftCardTable() {
         $.ajax({
             url: window.location.href,
@@ -108,10 +180,10 @@ jQuery(document).ready(function($) {
         });
     }
 
+    // Batch Export
     let batch_size = 100;
     let offset = 0;
 
-    // Batch Export
     $('#export_gift_cards_btn').on('click', function() {
         batchExportGiftCards();
     });

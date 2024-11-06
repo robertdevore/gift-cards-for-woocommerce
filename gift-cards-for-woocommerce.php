@@ -568,6 +568,7 @@ class WC_Gift_Cards {
                 // Modal HTML.
                 ?>
                 <div id="gift-card-edit-modal" style="display:none;">
+                    <p class="message" style="display: none;"></p>
                     <form id="gift-card-edit-form" class="wc-gift-card-form">
                         <?php wp_nonce_field( 'update_gift_card', 'update_gift_card_nonce' ); ?>
                         <input type="hidden" name="code" id="gift-card-code">

@@ -58,7 +58,7 @@
 
 /* Success message styling */
 
-#gift-card-edit-form .success-message {
+#gift-card-edit-modal .success-message {
     font-size: 16px;
     color: #4CAF50;
     text-align: center;
@@ -67,7 +67,7 @@
 
 /* Error message styling */
 
-#gift-card-edit-form .error-message {
+#gift-card-edit-modal .error-message {
     font-size: 14px;
     color: #FF0000;
     margin-bottom: 10px;
