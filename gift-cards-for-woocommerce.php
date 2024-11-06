@@ -9,7 +9,7 @@
  * @wordpress-plugin
  *
  * Plugin Name: Gift Cards for WooCommerce®
- * Description: Adds gift card functionality to WooCommerce®.
+ * Description: Adds gift card functionality to your WooCommerce® store.
  * Plugin URI:  https://github.com/robertdevore/gift-cards-for-woocommerce-free-plugin/
  * Version:     1.0.0
  * Author:      Robert DeVore
@@ -90,6 +90,9 @@ class WC_Gift_Cards {
     public function __construct() {
         // Initialize the plugin and database.
         register_activation_hook( __FILE__, [ $this, 'create_gift_card_table' ] );
+
+        // Register the uninstall hook to trigger the cleanup function.
+        register_uninstall_hook( __FILE__, 'wc_gift_cards_on_uninstall' );
 
         // Initialize the plugin.
         add_action( 'woocommerce_add_to_cart', [ $this, 'process_gift_card_purchase' ] );
@@ -232,6 +235,22 @@ class WC_Gift_Cards {
 
         require_once ABSPATH . 'wp-admin/includes/upgrade.php';
         dbDelta($sql);
+    }
+
+    /**
+     * Uninstall callback function to clean up database tables on plugin removal.
+     * 
+     * @since  1.0.0
+     * @return void
+     */
+    function wc_gift_cards_on_uninstall() {
+        global $wpdb;
+        $gift_card_table = $wpdb->prefix . 'gift_cards';
+        $activity_table  = $wpdb->prefix . 'gift_card_activities';
+
+        // Delete the custom tables
+        $wpdb->query( "DROP TABLE IF EXISTS $gift_card_table" );
+        $wpdb->query( "DROP TABLE IF EXISTS $activity_table" );
     }
 
     /**
