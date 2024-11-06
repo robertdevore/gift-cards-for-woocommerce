@@ -1802,30 +1802,34 @@ class WC_Gift_Cards {
      * Handles the AJAX request to update gift card details.
      *
      * Verifies permissions, validates the nonce, and updates specified fields.
-     * Responds with success or error messages based on update result.
+     * Logs balance adjustments and expiration date updates only when changes occur.
      *
      * @since  1.0.0
      * @return void Outputs JSON response indicating success or failure.
      */
     public function update_gift_card_ajax() {
+        // Verify the nonce for security.
         check_ajax_referer( 'update_gift_card', 'update_gift_card_nonce' );
 
+        // Check if the current user has the required permissions.
         if ( ! current_user_can( 'manage_woocommerce' ) ) {
             wp_send_json_error( esc_html__( 'You do not have permission to perform this action.', 'gift-cards-for-woocommerce' ) );
         }
 
+        // Retrieve and sanitize the gift card code from the POST request.
         $code = isset( $_POST['code'] ) ? sanitize_text_field( $_POST['code'] ) : '';
         if ( empty( $code ) ) {
             wp_send_json_error( esc_html__( 'Invalid gift card code.', 'gift-cards-for-woocommerce' ) );
         }
 
-        // Collect and sanitize other fields.
-        $balance         = isset( $_POST['balance'] ) ? floatval( $_POST['balance'] ) : 0.00;
-        $expiration_date = isset( $_POST['expiration_date'] ) ? sanitize_text_field( $_POST['expiration_date'] ) : null;
-        $recipient_email = isset( $_POST['recipient_email'] ) ? sanitize_email( $_POST['recipient_email'] ) : '';
-        $sender_name     = isset( $_POST['sender_name'] ) ? sanitize_text_field( $_POST['sender_name'] ) : '';
-        $message         = isset( $_POST['message'] ) ? sanitize_textarea_field( $_POST['message'] ) : '';
+        // Collect and sanitize other fields from the POST request.
+        $balance             = isset( $_POST['balance'] ) ? floatval( $_POST['balance'] ) : 0.00;
+        $new_expiration_date = isset( $_POST['expiration_date'] ) ? sanitize_text_field( $_POST['expiration_date'] ) : null;
+        $recipient_email     = isset( $_POST['recipient_email'] ) ? sanitize_email( $_POST['recipient_email'] ) : '';
+        $sender_name         = isset( $_POST['sender_name'] ) ? sanitize_text_field( $_POST['sender_name'] ) : '';
+        $message             = isset( $_POST['message'] ) ? sanitize_textarea_field( $_POST['message'] ) : '';
 
+        // Validate that the balance is not negative.
         if ( $balance < 0 ) {
             wp_send_json_error( esc_html__( 'Balance cannot be negative.', 'gift-cards-for-woocommerce' ) );
         }
@@ -1833,6 +1837,23 @@ class WC_Gift_Cards {
         global $wpdb;
         $table_name = $wpdb->prefix . 'gift_cards';
 
+        // Retrieve the current expiration_date from the database.
+        $current_gift_card = $wpdb->get_row( $wpdb->prepare( "SELECT expiration_date FROM $table_name WHERE code = %s", $code ), ARRAY_A );
+
+        if ( ! $current_gift_card ) {
+            wp_send_json_error( esc_html__( 'Gift card not found.', 'gift-cards-for-woocommerce' ) );
+        }
+
+        $current_expiration_date = $current_gift_card['expiration_date'];
+
+        // Normalize dates for accurate comparison.
+        $current_expiration_date_normalized = ( ! empty( $current_expiration_date ) && '0000-00-00' !== $current_expiration_date ) ? date( 'Y-m-d', strtotime( $current_expiration_date ) ) : '';
+        $new_expiration_date_normalized     = ( ! empty( $new_expiration_date ) && '0000-00-00' !== $new_expiration_date ) ? date( 'Y-m-d', strtotime( $new_expiration_date ) ) : '';
+
+        // Determine if the expiration date has changed.
+        $is_expiration_changed = ( $current_expiration_date_normalized !== $new_expiration_date_normalized );
+
+        // Prepare the data for updating the gift card.
         $update_data = [
             'balance'         => $balance,
             'recipient_email' => $recipient_email,
@@ -1841,14 +1862,13 @@ class WC_Gift_Cards {
         ];
         $update_format = [ '%f', '%s', '%s', '%s' ];
 
-        if ( ! empty( $expiration_date ) ) {
-            $update_data['expiration_date'] = $expiration_date;
-            $update_format[]                = '%s';
-        } else {
-            $update_data['expiration_date'] = null;
+        // Conditionally include 'expiration_date' if it has changed.
+        if ( $is_expiration_changed ) {
+            $update_data['expiration_date'] = ! empty( $new_expiration_date_normalized ) ? $new_expiration_date_normalized : null;
             $update_format[]                = '%s';
         }
 
+        // Execute the update query.
         $updated = $wpdb->update(
             $table_name,
             $update_data,
@@ -1857,17 +1877,23 @@ class WC_Gift_Cards {
             [ '%s' ]
         );
 
+        // Check if the update was successful.
         if ( false !== $updated ) {
-            // Clear cached data for the list table.
+            // Clear cached data for the list table to ensure fresh data is displayed.
             $this->clear_gift_cards_list_cache();
 
-            // Log and return success.
+            // Log the balance adjustment.
             $this->log_balance_adjustment( $code, $balance, get_current_user_id() );
-            if ( ! empty( $expiration_date ) ) {
-                $this->log_expiration_update( $code, $expiration_date, get_current_user_id() );
+
+            // Conditionally log the expiration date update only if it has changed.
+            if ( $is_expiration_changed ) {
+                $this->log_expiration_update( $code, $new_expiration_date_normalized, get_current_user_id() );
             }
+
+            // Send a success response back to the AJAX call.
             wp_send_json_success( esc_html__( 'Gift card updated successfully.', 'gift-cards-for-woocommerce' ) );
         } else {
+            // Send an error response if the update failed.
             wp_send_json_error( esc_html__( 'Failed to update gift card.', 'gift-cards-for-woocommerce' ) );
         }
     }
