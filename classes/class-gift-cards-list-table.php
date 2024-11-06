@@ -64,16 +64,16 @@ class Gift_Cards_List_Table extends WP_List_Table {
             $where[] = $wpdb->prepare( 'gift_card_type = %s', $gift_card_type );
         }
     
-        // Combine the WHERE clauses
+        // Combine the WHERE clauses.
         $where_sql = '';
         if ( ! empty( $where ) ) {
             $where_sql = 'WHERE ' . implode( ' AND ', $where );
         }
     
-        // Handle sorting
+        // Handle sorting.
         $allowed_orderby = [ 'code', 'balance', 'recipient_email', 'issued_date', 'expiration_date' ];
-        $orderby = ( ! empty( $_REQUEST['orderby'] ) && in_array( $_REQUEST['orderby'], $allowed_orderby ) ) ? $_REQUEST['orderby'] : 'issued_date';
-        $order = ( ! empty( $_REQUEST['order'] ) && in_array( strtolower( $_REQUEST['order'] ), [ 'asc', 'desc' ] ) ) ? strtoupper( $_REQUEST['order'] ) : 'DESC';
+        $orderby         = ( ! empty( $_REQUEST['orderby'] ) && in_array( $_REQUEST['orderby'], $allowed_orderby ) ) ? $_REQUEST['orderby'] : 'issued_date';
+        $order           = ( ! empty( $_REQUEST['order'] ) && in_array( strtolower( $_REQUEST['order'] ), [ 'asc', 'desc' ] ) ) ? strtoupper( $_REQUEST['order'] ) : 'DESC';
     
         // Fetch the items
         $offset = ( $current_page - 1 ) * $per_page;
@@ -117,7 +117,7 @@ class Gift_Cards_List_Table extends WP_List_Table {
             case 'expiration_date':
                 return ! empty( $item[ $column_name ] ) ? date_i18n( get_option( 'date_format' ), strtotime( $item[ $column_name ] ) ) : '-';
             default:
-                return print_r( $item, true ); // Show the whole array for troubleshooting purposes
+                return print_r( $item, true );
         }
     }
 

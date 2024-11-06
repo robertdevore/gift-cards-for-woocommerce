@@ -109,6 +109,7 @@ class WC_Gift_Cards {
         // Schedule gift card emails event.
         register_activation_hook( __FILE__, [ $this, 'schedule_gift_card_email_event' ] );
         add_action( 'wc_send_gift_card_emails', [ $this, 'send_scheduled_gift_card_emails' ] );
+        add_action( 'wc_send_gift_card_expiry_reminders', [ $this, 'send_gift_card_expiry_reminder_emails' ] );
 
         // Export CSV action.
         add_action( 'admin_init', [ $this, 'handle_export_action' ] );
@@ -600,19 +601,22 @@ class WC_Gift_Cards {
     public function display_settings_page() {
         // Process form submission
         if ( isset( $_POST['save_gift_card_settings'] ) && check_admin_referer( 'save_gift_card_settings', 'gift_card_settings_nonce' ) ) {
-            // Sanitize and save settings
-            $custom_email_image = isset( $_POST['custom_email_image'] ) ? esc_url_raw( $_POST['custom_email_image'] ) : '';
-            $custom_email_text  = isset( $_POST['custom_email_text'] ) ? wp_kses_post( $_POST['custom_email_text'] ) : '';
+            // Sanitize and save settings.
+            $custom_email_image          = isset( $_POST['custom_email_image'] ) ? esc_url_raw( $_POST['custom_email_image'] ) : '';
+            $custom_email_text           = isset( $_POST['custom_email_text'] ) ? wp_kses_post( $_POST['custom_email_text'] ) : '';
+            $reminder_days_before_expiry = isset( $_POST['reminder_days_before_expiry'] ) ? absint( $_POST['reminder_days_before_expiry'] ) : 7;
 
             update_option( 'gift_card_custom_email_image', $custom_email_image );
             update_option( 'gift_card_custom_email_text', $custom_email_text );
+            update_option( 'gift_card_reminder_days_before_expiry', $reminder_days_before_expiry );
 
             echo '<div class="notice notice-success"><p>' . esc_html__( 'Settings saved.', 'gift-cards-for-woocommerce' ) . '</p></div>';
         }
 
-        // Retrieve existing settings
-        $custom_email_image = get_option( 'gift_card_custom_email_image', '' );
-        $custom_email_text  = get_option( 'gift_card_custom_email_text', '' );
+        // Retrieve existing settings.
+        $custom_email_image          = get_option( 'gift_card_custom_email_image', '' );
+        $custom_email_text           = get_option( 'gift_card_custom_email_text', '' );
+        $reminder_days_before_expiry = get_option( 'gift_card_reminder_days_before_expiry', 7 );
 
         ?>
         <h2><?php esc_html_e( 'Gift Card Email Settings', 'gift-cards-for-woocommerce' ); ?></h2>
@@ -641,6 +645,15 @@ class WC_Gift_Cards {
                         ] );
                         ?>
                         <p class="description"><?php esc_html_e( 'Enter custom text to include in the gift card emails.', 'gift-cards-for-woocommerce' ); ?></p>
+                    </td>
+                </tr>
+                <tr valign="top">
+                    <th scope="row">
+                        <label for="reminder_days_before_expiry"><?php esc_html_e( 'Days Before Expiration for Reminder Email', 'gift-cards-for-woocommerce' ); ?></label>
+                    </th>
+                    <td>
+                        <input type="number" name="reminder_days_before_expiry" id="reminder_days_before_expiry" value="<?php echo esc_attr( $reminder_days_before_expiry ); ?>" min="1" style="width:100px;" />
+                        <p class="description"><?php esc_html_e( 'Enter the number of days before a gift card expires to send a reminder email.', 'gift-cards-for-woocommerce' ); ?></p>
                     </td>
                 </tr>
             </table>
@@ -1005,6 +1018,10 @@ class WC_Gift_Cards {
         if ( ! wp_next_scheduled( 'wc_send_gift_card_emails' ) ) {
             wp_schedule_event( strtotime( 'midnight' ), 'daily', 'wc_send_gift_card_emails' );
         }
+
+        if ( ! wp_next_scheduled( 'wc_send_gift_card_expiry_reminders' ) ) {
+            wp_schedule_event( strtotime( 'midnight' ), 'daily', 'wc_send_gift_card_expiry_reminders' );
+        }
     }
 
     /**
@@ -1040,7 +1057,51 @@ class WC_Gift_Cards {
     
         // Trigger the email.
         do_action( 'wc_gift_card_email_notification', $gift_card );
-    }    
+    }
+
+    /**
+     * Sends reminder emails for gift cards that are about to expire.
+     *
+     * @return void
+     */
+    public function send_gift_card_expiry_reminder_emails() {
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'gift_cards';
+
+        // Get the number of days before expiration to send the reminder.
+        $days_before_expiry = get_option( 'gift_card_reminder_days_before_expiry', 7 );
+
+        // Calculate the date range.
+        $start_date = date( 'Y-m-d', current_time( 'timestamp' ) );
+        $end_date = date( 'Y-m-d', strtotime( '+' . $days_before_expiry . ' days', current_time( 'timestamp' ) ) );
+
+        // Query for gift cards that expire between now and the target date.
+        $gift_cards = $wpdb->get_results( $wpdb->prepare(
+            "SELECT * FROM $table_name WHERE expiration_date BETWEEN %s AND %s AND expiration_date IS NOT NULL AND expiration_date != '0000-00-00'",
+            $start_date,
+            $end_date
+        ) );
+
+        if ( ! empty( $gift_cards ) ) {
+            foreach ( $gift_cards as $gift_card ) {
+                $this->send_gift_card_expiry_reminder_email( $gift_card );
+            }
+        }
+    }
+    
+    /**
+     * Sends a reminder email that a gift card is about to expire.
+     *
+     * @param object $gift_card The gift card data.
+     * @return void
+     */
+    private function send_gift_card_expiry_reminder_email( $gift_card ) {
+        // Ensure that the email classes are initialized.
+        WC()->mailer()->emails;
+
+        // Trigger the reminder email.
+        do_action( 'wc_gift_card_expiry_reminder_email_notification', $gift_card );
+    }
 
     /**
      * Generates gift card variations when the product is marked as a gift card.
@@ -1511,9 +1572,12 @@ class WC_Gift_Cards {
     public function add_gift_card_email_class( $email_classes ) {
         // Include the custom email class.
         require_once plugin_dir_path( __FILE__ ) . 'classes/class-wc-gift-card-email.php';
+        require_once plugin_dir_path( __FILE__ ) . 'classes/class-wc-gift-card-expiry-reminder-email.php';
 
-        // Add the email class to the list of email classes that WooCommerce loads.
+        // Add the email classes to the list of email classes that WooCommerce® loads.
         $email_classes['WC_Gift_Card_Email'] = new WC_Gift_Card_Email();
+        $email_classes['WC_Gift_Card_Expiry_Reminder_Email'] = new WC_Gift_Card_Expiry_Reminder_Email();
+
         return $email_classes;
     }
 
