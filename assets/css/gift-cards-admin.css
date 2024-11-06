@@ -55,3 +55,100 @@
     font-size: 14px;
     padding: 8px 14px;
 }
+
+/* Success message styling */
+
+#gift-card-edit-form .success-message {
+    font-size: 16px;
+    color: #4CAF50;
+    text-align: center;
+    margin-top: 20px;
+}
+
+/* Error message styling */
+
+#gift-card-edit-form .error-message {
+    font-size: 14px;
+    color: #FF0000;
+    margin-bottom: 10px;
+}
+
+/* Override jQuery UI Dialog styles to match WooCommerce */
+.ui-dialog.gift-card-dialog {
+    font-family: inherit;
+    font-size: 14px;
+}
+
+.ui-dialog.gift-card-dialog .ui-dialog-titlebar {
+    background: #f1f1f1;
+    border-bottom: 1px solid #ccc;
+    padding: 10px;
+}
+
+.ui-dialog.gift-card-dialog .ui-dialog-title {
+    font-weight: bold;
+    color: #555;
+    margin: 0;
+}
+
+.ui-dialog.gift-card-dialog .ui-dialog-content {
+    padding: 20px;
+}
+
+.ui-dialog.gift-card-dialog .ui-dialog-buttonpane {
+    display: none; /* We handle buttons within the form */
+}
+
+.ui-dialog.gift-card-dialog .ui-dialog-titlebar-close {
+    background: transparent;
+    border: none;
+}
+
+.ui-dialog.gift-card-dialog .ui-dialog-titlebar-close .ui-icon {
+    background-image: url('data:image/svg+xml;utf8,<svg fill="%23555" height="18" viewBox="0 0 18 18" width="18" xmlns="http://www.w3.org/2000/svg"><path d="M14.53 3.47a.75.75 0 0 0-1.06 0L9 7.94 4.53 3.47a.75.75 0 0 0-1.06 1.06L7.94 9l-4.47 4.47a.75.75 0 0 0 1.06 1.06L9 10.06l4.47 4.47a.75.75 0 0 0 1.06-1.06L10.06 9l4.47-4.47a.75.75 0 0 0 0-1.06z"/></svg>');
+    background-position: center center;
+    background-repeat: no-repeat;
+}
+
+.ui-dialog.gift-card-dialog .ui-widget-content {
+    border: none;
+}
+
+/* Style the form fields */
+.wc-gift-card-form .form-row {
+    margin-bottom: 15px;
+}
+
+.wc-gift-card-form label {
+    font-weight: bold;
+    display: block;
+    margin-bottom: 5px;
+    color: #555;
+}
+
+.wc-gift-card-form .input-text {
+    width: 100%;
+    padding: 8px;
+    box-sizing: border-box;
+    border-radius: 4px;
+}
+
+.wc-gift-card-form .input-text:focus {
+    border-color: #7e47a2;
+    box-shadow: 0 0 0 1px #7e47a2;
+}
+
+.wc-gift-card-form .required {
+    color: #dc3232;
+}
+
+.wc-gift-card-form .button-primary {
+    background-color: #7e47a2;
+    border-color: #7e47a2;
+    color: #fff;
+}
+
+.wc-gift-card-form .button-primary:hover {
+    background-color: #96588a;
+    border-color: #96588a;
+}

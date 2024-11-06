@@ -118,6 +118,10 @@ class WC_Gift_Cards {
 
         // Register the email class with WooCommerce.
         add_filter( 'woocommerce_email_classes', [ $this, 'add_gift_card_email_class' ] );
+
+        // AJAX actions for editing gift cards.
+        add_action( 'wp_ajax_get_gift_card_data', [ $this, 'get_gift_card_data_ajax' ] );
+        add_action( 'wp_ajax_update_gift_card', [ $this, 'update_gift_card_ajax' ] );
     }
 
     public static function plugin_activated() {
@@ -165,6 +169,9 @@ class WC_Gift_Cards {
             return;
         }
 
+        // Enqueue the WooCommerce® admin styles.
+        wp_enqueue_style( 'woocommerce_admin_styles' );
+
         // Enqueue custom admin styles.
         wp_enqueue_style(
             'gift-cards-admin-custom-styles',
@@ -173,10 +180,14 @@ class WC_Gift_Cards {
             '1.0'
         );
 
+        // Enqueue jQuery UI Dialog for modal.
+        wp_enqueue_script( 'jquery-ui-dialog' );
+        wp_enqueue_style( 'wp-jquery-ui-dialog' );
+
         wp_enqueue_script(
             'gift-cards-admin',
             plugins_url( 'assets/js/gift-cards-admin.js', __FILE__ ),
-            [ 'jquery' ],
+            [ 'jquery', 'jquery-ui-dialog' ],
             '1.0',
             true
         );
@@ -453,6 +464,51 @@ class WC_Gift_Cards {
                 case 'add_card':
                     $this->display_add_card_form();
                     break;
+            }
+            // After displaying the gift cards table, add the modal HTML
+            if ( 'gift_cards' === $active_tab ) {
+                $this->display_gift_cards_table();
+
+                // Modal HTML.
+                ?>
+                <div id="gift-card-edit-modal" style="display:none;">
+                    <form id="gift-card-edit-form" class="wc-gift-card-form">
+                        <?php wp_nonce_field( 'update_gift_card', 'update_gift_card_nonce' ); ?>
+                        <input type="hidden" name="code" id="gift-card-code">
+                        
+                        <p class="form-field form-row form-row-wide">
+                            <label for="gift-card-balance"><?php esc_html_e( 'Gift Card Balance', 'gift-cards-for-woocommerce' ); ?> <span class="required">*</span></label>
+                            <input type="number" class="input-text" name="balance" id="gift-card-balance" required min="0.01" step="0.01">
+                        </p>
+                        
+                        <p class="form-field form-row form-row-wide">
+                            <label for="gift-card-expiration-date"><?php esc_html_e( 'Expiration Date', 'gift-cards-for-woocommerce' ); ?></label>
+                            <input type="date" class="input-text" name="expiration_date" id="gift-card-expiration-date">
+                        </p>
+                        
+                        <p class="form-field form-row form-row-wide">
+                            <label for="gift-card-recipient-email"><?php esc_html_e( 'Recipient Email', 'gift-cards-for-woocommerce' ); ?> <span class="required">*</span></label>
+                            <input type="email" class="input-text" name="recipient_email" id="gift-card-recipient-email" required>
+                        </p>
+                        
+                        <p class="form-field form-row form-row-wide">
+                            <label for="gift-card-sender-name"><?php esc_html_e( 'Sender Name', 'gift-cards-for-woocommerce' ); ?></label>
+                            <input type="text" class="input-text" name="sender_name" id="gift-card-sender-name">
+                        </p>
+                        
+                        <p class="form-field form-row form-row-wide">
+                            <label for="gift-card-message"><?php esc_html_e( 'Message', 'gift-cards-for-woocommerce' ); ?></label>
+                            <textarea name="message" id="gift-card-message" class="input-text" rows="4"></textarea>
+                        </p>
+                        
+                        <p class="form-row">
+                            <button type="submit" class="button button-primary"><?php esc_html_e( 'Save Changes', 'gift-cards-for-woocommerce' ); ?></button>
+                        </p>
+                    </form>
+                </div>
+                <?php
+            } else {
+                // Do nothing.
             }
             ?>
         </div>
@@ -1410,6 +1466,93 @@ class WC_Gift_Cards {
         return $email_classes;
     }
 
+    public function get_gift_card_data_ajax() {
+        check_ajax_referer( 'edit_gift_card_nonce', 'nonce' );
+    
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( __( 'You do not have permission to perform this action.', 'gift-cards-for-woocommerce' ) );
+        }
+    
+        $code = isset( $_POST['code'] ) ? sanitize_text_field( $_POST['code'] ) : '';
+    
+        if ( empty( $code ) ) {
+            wp_send_json_error( __( 'Invalid gift card code.', 'gift-cards-for-woocommerce' ) );
+        }
+    
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'gift_cards';
+    
+        $gift_card = $wpdb->get_row( $wpdb->prepare( "SELECT * FROM $table_name WHERE code = %s", $code ), ARRAY_A );
+    
+        if ( $gift_card ) {
+            // Format date fields for input[type="date"]
+            $gift_card['expiration_date'] = ! empty( $gift_card['expiration_date'] ) && '0000-00-00' !== $gift_card['expiration_date'] ? date( 'Y-m-d', strtotime( $gift_card['expiration_date'] ) ) : '';
+            $gift_card['delivery_date']   = ! empty( $gift_card['delivery_date'] ) && '0000-00-00' !== $gift_card['delivery_date'] ? date( 'Y-m-d', strtotime( $gift_card['delivery_date'] ) ) : '';
+    
+            wp_send_json_success( $gift_card );
+        } else {
+            wp_send_json_error( __( 'Gift card not found.', 'gift-cards-for-woocommerce' ) );
+        }
+    }
+
+    public function update_gift_card_ajax() {
+        check_ajax_referer( 'update_gift_card', 'update_gift_card_nonce' );
+    
+        if ( ! current_user_can( 'manage_woocommerce' ) ) {
+            wp_send_json_error( __( 'You do not have permission to perform this action.', 'gift-cards-for-woocommerce' ) );
+        }
+    
+        $code = isset( $_POST['code'] ) ? sanitize_text_field( $_POST['code'] ) : '';
+    
+        if ( empty( $code ) ) {
+            wp_send_json_error( __( 'Invalid gift card code.', 'gift-cards-for-woocommerce' ) );
+        }
+    
+        // Collect and sanitize other fields
+        $balance         = isset( $_POST['balance'] ) ? floatval( $_POST['balance'] ) : 0.00;
+        $expiration_date = isset( $_POST['expiration_date'] ) ? sanitize_text_field( $_POST['expiration_date'] ) : null;
+        $recipient_email = isset( $_POST['recipient_email'] ) ? sanitize_email( $_POST['recipient_email'] ) : '';
+        $sender_name     = isset( $_POST['sender_name'] ) ? sanitize_text_field( $_POST['sender_name'] ) : '';
+        $message         = isset( $_POST['message'] ) ? sanitize_textarea_field( $_POST['message'] ) : '';
+    
+        if ( $balance < 0 ) {
+            wp_send_json_error( __( 'Balance cannot be negative.', 'gift-cards-for-woocommerce' ) );
+        }
+    
+        global $wpdb;
+        $table_name = $wpdb->prefix . 'gift_cards';
+    
+        $update_data = [
+            'balance'         => $balance,
+            'recipient_email' => $recipient_email,
+            'sender_name'     => $sender_name,
+            'message'         => $message,
+        ];
+        $update_format = [ '%f', '%s', '%s', '%s' ];
+    
+        if ( ! empty( $expiration_date ) ) {
+            $update_data['expiration_date'] = $expiration_date;
+            $update_format[]                = '%s';
+        } else {
+            $update_data['expiration_date'] = null;
+            $update_format[]                = '%s';
+        }
+    
+        $updated = $wpdb->update(
+            $table_name,
+            $update_data,
+            [ 'code' => $code ],
+            $update_format,
+            [ '%s' ]
+        );
+    
+        if ( false !== $updated ) {
+            wp_send_json_success( __( 'Gift card updated successfully.', 'gift-cards-for-woocommerce' ) );
+        } else {
+            wp_send_json_error( __( 'Failed to update gift card.', 'gift-cards-for-woocommerce' ) );
+        }
+    }
+    
 }
 
 new WC_Gift_Cards();

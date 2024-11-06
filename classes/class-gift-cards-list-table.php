@@ -123,14 +123,20 @@ class Gift_Cards_List_Table extends WP_List_Table {
 
     protected function column_actions( $item ) {
         $delete_nonce = wp_create_nonce( 'delete_gift_card_nonce' );
+        $edit_nonce   = wp_create_nonce( 'edit_gift_card_nonce' );
         $code         = esc_attr( $item['code'] );
 
-        $actions = sprintf(
+        $actions  = sprintf(
+            '<button style="line-height:24px;" class="button edit-gift-card" data-code="%s" data-nonce="%s"><span class="dashicons dashicons-edit"></span></button> ',
+            $code,
+            $edit_nonce
+        );
+        $actions .= sprintf(
             '<button style="line-height:24px;" class="button delete-gift-card" data-code="%s" data-nonce="%s"><span class="dashicons dashicons-trash"></span></button>',
             $code,
             $delete_nonce
         );
-        
+
         return $actions;
     }
 
