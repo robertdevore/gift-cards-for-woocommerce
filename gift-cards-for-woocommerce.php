@@ -470,8 +470,12 @@ class WC_Gift_Cards {
         $gift_cards_table = new Gift_Cards_List_Table();
         $gift_cards_table->prepare_items();
         ?>
-        <form method="post">
+        <form method="get">
             <?php
+            // Preserve the page and tab parameters
+            echo '<input type="hidden" name="page" value="gift-cards-free" />';
+            echo '<input type="hidden" name="tab" value="gift_cards" />';
+            $gift_cards_table->search_box( __( 'Search Gift Cards', 'gift-cards-for-woocommerce' ), 'gift-card-search' );
             $gift_cards_table->display();
             ?>
         </form>
