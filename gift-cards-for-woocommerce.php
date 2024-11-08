@@ -4,13 +4,13 @@
  *
  * @link              https://robertdevore.com
  * @since             1.0.0
- * @package           Back_In_Stock_Notifications
+ * @package           Gift_Cards_For_WooCommerce
  *
  * @wordpress-plugin
  *
  * Plugin Name: Gift Cards for WooCommerce®
  * Description: Adds gift card functionality to your WooCommerce® store.
- * Plugin URI:  https://github.com/robertdevore/gift-cards-for-woocommerce-free-plugin/
+ * Plugin URI:  https://github.com/robertdevore/gift-cards-for-woocommerce/
  * Version:     1.0.0
  * Author:      Robert DeVore
  * Author URI:  https://robertdevore.com/
@@ -51,7 +51,7 @@ define( 'GIFT_CARDS_FOR_WOOCOMMERCE_VERSION', '1.0.0' );
  */
 function wc_gift_cards_woocommerce_inactive_notice() {
     echo '<div class="error"><p>';
-    esc_html_e( 'Gift Cards for WooCommerce® (free) requires WooCommerce to be installed and active.', 'gift-cards-for-woocommerce' );
+    esc_html_e( 'Gift Cards for WooCommerce® (free) requires WooCommerce® to be installed and active.', 'gift-cards-for-woocommerce' );
     echo '</p></div>';
 }
 
@@ -338,6 +338,7 @@ class WC_Gift_Cards {
         global $wpdb;
         $table_name = $wpdb->prefix . 'gift_cards';
 
+        // Get deleted codes (if any).
         $deleted = $wpdb->delete( $table_name, [ 'code' => $code ], [ '%s' ] );
 
         if ( $deleted ) {
@@ -369,6 +370,7 @@ class WC_Gift_Cards {
     /**
      * Validates and applies the gift card code at checkout.
      *
+     * @since  1.0.0
      * @return void
      */
     public function apply_gift_card() {
@@ -523,6 +525,7 @@ class WC_Gift_Cards {
      * This function outputs the main Gift Cards admin page, with options to export/import CSV files,
      * and navigate between "Gift Cards", "Activity", and "Add Card" sections.
      *
+     * @since  1.0.0
      * @return void
      */
     public function display_admin_page() {
