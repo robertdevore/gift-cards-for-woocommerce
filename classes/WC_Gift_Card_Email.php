@@ -1,7 +1,12 @@
 <?php
+
+namespace GiftCards\WooCommerce\Emails;
+
 if ( ! defined( 'ABSPATH' ) ) {
     exit;
 }
+
+use WC_Email;
 
 /**
  * WC_Gift_Card_Email Class

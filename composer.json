@@ -1,0 +1,22 @@
+{
+    "name": "robertdevore/gift-cards-for-woocommerce",
+    "description": "A free WooCommerce® plugin for managing gift cards.",
+    "type": "wordpress-plugin",
+    "license": "GPL-2.0-or-later",
+    "authors": [
+      {
+        "name": "Robert DeVore",
+        "email": "me@robertdevore.com",
+        "homepage": "https://robertdevore.com"
+      }
+    ],
+    "require": {
+      "php": ">=7.4",
+      "composer/installers": "~1.0"
+    },
+    "autoload": {
+      "psr-4": {
+        "GiftCards\\WooCommerce\\": "classes/"
+      }
+    }
+}

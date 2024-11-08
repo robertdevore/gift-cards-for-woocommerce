@@ -32,6 +32,10 @@ if ( ! in_array( 'woocommerce/woocommerce.php', apply_filters( 'active_plugins',
     return;
 }
 
+use GiftCards\WooCommerce\ListTable\Gift_Cards_List_Table;
+use GiftCards\WooCommerce\Emails\WC_Gift_Card_Email;
+use GiftCards\WooCommerce\Emails\WC_Gift_Card_Expiry_Reminder_Email;
+
 /**
  * Current plugin version.
  */
@@ -52,7 +56,7 @@ function wc_gift_cards_woocommerce_inactive_notice() {
 }
 
 // Include the custom gift cards list table class.
-require_once plugin_dir_path( __FILE__ ) . 'classes/class-gift-cards-list-table.php';
+require_once plugin_dir_path( __FILE__ ) . 'classes/Gift_Cards_List_Table.php';
 
 // Run plugin_activated from WC_Gift_Cards.
 register_activation_hook( __FILE__, [ 'WC_Gift_Cards', 'plugin_activated' ] );
@@ -1773,11 +1777,11 @@ class WC_Gift_Cards {
      */
     public function add_gift_card_email_class( $email_classes ) {
         // Include the custom email class.
-        require_once plugin_dir_path( __FILE__ ) . 'classes/class-wc-gift-card-email.php';
-        require_once plugin_dir_path( __FILE__ ) . 'classes/class-wc-gift-card-expiry-reminder-email.php';
+        require_once plugin_dir_path( __FILE__ ) . 'classes/WC_Gift_Card_Email.php';
+        require_once plugin_dir_path( __FILE__ ) . 'classes/WC_Gift_Card_Expiry_Reminder_Email.php';
 
         // Add the email classes to the list of email classes that WooCommerce® loads.
-        $email_classes['WC_Gift_Card_Email'] = new WC_Gift_Card_Email();
+        $email_classes['WC_Gift_Card_Email']                 = new WC_Gift_Card_Email();
         $email_classes['WC_Gift_Card_Expiry_Reminder_Email'] = new WC_Gift_Card_Expiry_Reminder_Email();
 
         return $email_classes;

@@ -9,6 +9,8 @@
  * @since      1.0.0
  */
 
+namespace GiftCards\WooCommerce\ListTable;
+
 if ( ! class_exists( 'WP_List_Table' ) ) {
     require_once ABSPATH . 'wp-admin/includes/class-wp-list-table.php';
 }
@@ -18,7 +20,7 @@ if ( ! class_exists( 'WP_List_Table' ) ) {
  *
  * Extends the WP_List_Table class to display gift card data.
  */
-class Gift_Cards_List_Table extends WP_List_Table {
+class Gift_Cards_List_Table extends \WP_List_Table {
 
     /**
      * Constructor to set up the list table.
