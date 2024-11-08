@@ -917,6 +917,9 @@ class WC_Gift_Cards {
                 // Log the creation of this gift card.
                 $this->log_creation( $code, $balance, $user ? $user->ID : null );
 
+                // Clear the Gift Cards List Cache.
+                $this->clear_gift_cards_list_cache();
+
                 // Prepare gift card object for email
                 $gift_card = (object) [
                     'code'            => $code,

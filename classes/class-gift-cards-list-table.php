@@ -69,12 +69,18 @@ class Gift_Cards_List_Table extends WP_List_Table {
 
         $this->_column_headers = [ $columns, $hidden, $sortable ];
 
-        $search = isset( $_REQUEST['s'] ) ? wp_unslash( trim( $_REQUEST['s'] ) ) : '';
+        $search         = isset( $_REQUEST['s'] ) ? wp_unslash( trim( $_REQUEST['s'] ) ) : '';
+        $gift_card_type = isset( $_REQUEST['gift_card_type'] ) ? sanitize_text_field( $_REQUEST['gift_card_type'] ) : '';
+
         $where  = [];
 
         if ( ! empty( $search ) ) {
             $search_like = '%' . $wpdb->esc_like( $search ) . '%';
             $where[]     = $wpdb->prepare( "( code LIKE %s OR recipient_email LIKE %s )", $search_like, $search_like );
+        }
+
+        if ( ! empty( $gift_card_type ) && in_array( $gift_card_type, [ 'digital', 'physical' ], true ) ) {
+            $where[] = $wpdb->prepare( "gift_card_type = %s", $gift_card_type );
         }
 
         $where_sql = ! empty( $where ) ? 'WHERE ' . implode( ' AND ', $where ) : '';
@@ -87,7 +93,7 @@ class Gift_Cards_List_Table extends WP_List_Table {
         if ( isset( $_POST['action'] ) && 'update_gift_card' === $_POST['action'] ) {
             $this->items = false;
         } else {
-            $cache_key   = 'gift_cards_list_' . md5( serialize( [ $current_page, $search, $orderby, $order ] ) );
+            $cache_key   = 'gift_cards_list_' . md5( serialize( [ $current_page, $search, $gift_card_type, $orderby, $order ] ) );
             $this->items = get_transient( $cache_key );
         }
 
@@ -100,7 +106,7 @@ class Gift_Cards_List_Table extends WP_List_Table {
             set_transient( $cache_key, $this->items, HOUR_IN_SECONDS );
         }
 
-        $count_cache_key = 'gift_cards_total_count';
+        $count_cache_key = 'gift_cards_total_count_' . md5( serialize( [ $search, $gift_card_type ] ) );
         $total_items     = get_transient( $count_cache_key );
 
         if ( false === $total_items ) {
