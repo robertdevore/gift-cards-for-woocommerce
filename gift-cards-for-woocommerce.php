@@ -397,17 +397,17 @@ class WC_Gift_Cards {
      */
     public function update_balance_on_completion( $order_id ) {
         $order = wc_get_order( $order_id );
-    
+
         foreach ( $order->get_items() as $item_id => $item ) {
             $product = $item->get_product();
             if ( 'yes' === get_post_meta( $product->get_id(), '_is_gift_card', true ) ) {
                 $gift_card_data = [
-                    'gift_card_type'    => $item->get_meta( 'gift_card_type' ),
-                    'recipient_email'   => $item->get_meta( 'gift_card_to' ),
-                    'sender_name'       => $item->get_meta( 'gift_card_from' ),
-                    'message'           => $item->get_meta( 'gift_card_message' ),
-                    'delivery_date'     => $item->get_meta( 'gift_card_delivery_date' ),
-                    'balance'           => $item->get_total(),
+                    'gift_card_type'  => $item->get_meta( 'gift_card_type' ),
+                    'recipient_email' => $item->get_meta( 'gift_card_to' ),
+                    'sender_name'     => $item->get_meta( 'gift_card_from' ),
+                    'message'         => $item->get_meta( 'gift_card_message' ),
+                    'delivery_date'   => $item->get_meta( 'gift_card_delivery_date' ),
+                    'balance'         => $item->get_total(),
                 ];
 
                 // Generate unique code.
@@ -416,7 +416,7 @@ class WC_Gift_Cards {
                 // Insert gift card into database.
                 global $wpdb;
                 $table_name = $wpdb->prefix . 'gift_cards';
-    
+
                 $wpdb->insert(
                     $table_name,
                     [
@@ -472,6 +472,8 @@ class WC_Gift_Cards {
      * Checks the balance of a gift card.
      *
      * @param string $code The gift card code.
+     * 
+     * @since  1.0.0
      * @return float The balance of the gift card.
      */
     private function check_gift_card_balance( $code ) {
@@ -506,6 +508,7 @@ class WC_Gift_Cards {
     /**
      * Adds the Gift Cards admin menu under WooCommerce.
      *
+     * @since  1.0.0
      * @return void
      */
     public function add_admin_menu() {
@@ -531,7 +534,7 @@ class WC_Gift_Cards {
     public function display_admin_page() {
         $active_tab = isset( $_GET['tab'] ) ? sanitize_text_field( $_GET['tab'] ) : 'gift_cards';
 
-        // Check for import status and display messages
+        // Check for import status and display messages.
         if ( isset( $_GET['import_success'] ) ) {
             if ( 'true' === $_GET['import_success'] ) {
                 echo '<div class="notice notice-success is-dismissible"><p>' . esc_html__( 'CSV imported successfully!', 'gift-cards-for-woocommerce' ) . '</p></div>';
@@ -652,10 +655,10 @@ class WC_Gift_Cards {
         ?>
         <form method="get">
             <?php
-            // Preserve the page and tab parameters
+            // Preserve the page and tab parameters.
             echo '<input type="hidden" name="page" value="gift-cards-free" />';
             echo '<input type="hidden" name="tab" value="gift_cards" />';
-            $gift_cards_table->search_box( __( 'Search Gift Cards', 'gift-cards-for-woocommerce' ), 'gift-card-search' );
+            $gift_cards_table->search_box( esc_html__( 'Search Gift Cards', 'gift-cards-for-woocommerce' ), 'gift-card-search' );
             $gift_cards_table->display();
             ?>
         </form>
@@ -927,7 +930,7 @@ class WC_Gift_Cards {
                 // Clear the Gift Cards List Cache.
                 $this->clear_gift_cards_list_cache();
 
-                // Prepare gift card object for email
+                // Prepare gift card object for email.
                 $gift_card = (object) [
                     'code'            => $code,
                     'balance'         => $balance,
@@ -955,6 +958,7 @@ class WC_Gift_Cards {
     /**
      * Enqueues JavaScript for applying the gift card at checkout.
      *
+     * @since  1.0.0
      * @return void
      */
     public function enqueue_scripts() {
@@ -991,6 +995,8 @@ class WC_Gift_Cards {
      * at checkout, up to the order subtotal. It also saves the discount amount in the session.
      *
      * @param WC_Cart $cart The WooCommerce cart object.
+     * 
+     * @since  1.0.0
      * @return void
      */
     public function apply_gift_card_discount( $cart ) {
@@ -1025,6 +1031,8 @@ class WC_Gift_Cards {
      * Saves the applied gift card code and discount to the order meta.
      *
      * @param int $order_id The ID of the order.
+     * 
+     * @since  1.0.0
      * @return void
      */
     public function save_gift_card_to_order( $order_id ) {
@@ -1040,10 +1048,10 @@ class WC_Gift_Cards {
      */
     public function add_gift_card_checkbox() {
         woocommerce_wp_checkbox( [
-            'id'            => '_is_gift_card',
-            'label'         => __( 'Gift Card', 'gift-cards-for-woocommerce' ),
-            'description'   => __( 'Enable this option to make this product a gift card.', 'gift-cards-for-woocommerce' ),
-            'desc_tip'      => true,
+            'id'          => '_is_gift_card',
+            'label'       => esc_html__( 'Gift Card', 'gift-cards-for-woocommerce' ),
+            'description' => esc_html__( 'Enable this option to make this product a gift card.', 'gift-cards-for-woocommerce' ),
+            'desc_tip'    => true,
         ] );
     }
 
@@ -1054,6 +1062,8 @@ class WC_Gift_Cards {
      * and updates the product meta accordingly.
      *
      * @param int $post_id The ID of the product post.
+     * 
+     * @since  1.0.0
      * @return void
      */
     public function save_gift_card_checkbox( $post_id ) {
@@ -1064,6 +1074,7 @@ class WC_Gift_Cards {
     /**
      * Displays gift card fields on the product page if the product is marked as a gift card.
      *
+     * @since  1.0.0
      * @return void
      */
     public function display_gift_card_fields_on_product() {
@@ -1079,38 +1090,38 @@ class WC_Gift_Cards {
         // Gift Card Type
         woocommerce_form_field( 'gift_card_type', [
             'type'     => 'select',
-            'label'    => __( 'Gift Card Type', 'gift-cards-for-woocommerce' ),
+            'label'    => esc_html__( 'Gift Card Type', 'gift-cards-for-woocommerce' ),
             'required' => true,
             'options'  => [
-                'digital'  => __( 'Digital', 'gift-cards-for-woocommerce' ),
-                'physical' => __( 'Physical', 'gift-cards-for-woocommerce' ),
+                'digital'  => esc_html__( 'Digital', 'gift-cards-for-woocommerce' ),
+                'physical' => esc_html__( 'Physical', 'gift-cards-for-woocommerce' ),
             ],
         ] );
 
         // To (email).
         woocommerce_form_field( 'gift_card_to', [
             'type'     => 'email',
-            'label'    => __( 'To (Email)', 'gift-cards-for-woocommerce' ),
+            'label'    => esc_html__( 'To (Email)', 'gift-cards-for-woocommerce' ),
             'required' => true,
         ] );
 
         // From (name).
         woocommerce_form_field( 'gift_card_from', [
             'type'     => 'text',
-            'label'    => __( 'From (Name)', 'gift-cards-for-woocommerce' ),
+            'label'    => esc_html__( 'From (Name)', 'gift-cards-for-woocommerce' ),
             'required' => true,
         ] );
 
         // Message.
         woocommerce_form_field( 'gift_card_message', [
             'type'  => 'textarea',
-            'label' => __( 'Message', 'gift-cards-for-woocommerce' ),
+            'label' => esc_html__( 'Message', 'gift-cards-for-woocommerce' ),
         ] );
 
         // Delivery Date.
         woocommerce_form_field( 'gift_card_delivery_date', [
             'type'              => 'date',
-            'label'             => __( 'Delivery Date', 'gift-cards-for-woocommerce' ),
+            'label'             => esc_html__( 'Delivery Date', 'gift-cards-for-woocommerce' ),
             'default'           => date( 'Y-m-d', current_time( 'timestamp' ) ),
             'required'          => true,
             'custom_attributes' => [
@@ -1132,10 +1143,10 @@ class WC_Gift_Cards {
      */
     public function add_gift_card_data_to_cart( $cart_item_data, $product_id ) {
         if ( isset( $_POST['gift_card_type'] ) ) {
-            $cart_item_data['gift_card_type']         = sanitize_text_field( $_POST['gift_card_type'] );
-            $cart_item_data['gift_card_to']           = sanitize_email( $_POST['gift_card_to'] );
-            $cart_item_data['gift_card_from']         = sanitize_text_field( $_POST['gift_card_from'] );
-            $cart_item_data['gift_card_message']      = sanitize_textarea_field( $_POST['gift_card_message'] );
+            $cart_item_data['gift_card_type']          = sanitize_text_field( $_POST['gift_card_type'] );
+            $cart_item_data['gift_card_to']            = sanitize_email( $_POST['gift_card_to'] );
+            $cart_item_data['gift_card_from']          = sanitize_text_field( $_POST['gift_card_from'] );
+            $cart_item_data['gift_card_message']       = sanitize_textarea_field( $_POST['gift_card_message'] );
             $cart_item_data['gift_card_delivery_date'] = sanitize_text_field( $_POST['gift_card_delivery_date'] );
         }
         return $cart_item_data;
@@ -1146,29 +1157,31 @@ class WC_Gift_Cards {
      *
      * @param array $item_data The existing item data to display.
      * @param array $cart_item The cart item data.
+     * 
+     * @since  1.0.0
      * @return array
      */
     public function display_gift_card_data_in_cart( $item_data, $cart_item ) {
         if ( isset( $cart_item['gift_card_type'] ) ) {
             $item_data[] = [
-                'name'    => __( 'Gift Card Type', 'gift-cards-for-woocommerce' ),
-                'value'   => sanitize_text_field( $cart_item['gift_card_type'] ),
+                'name'  => esc_html__( 'Gift Card Type', 'gift-cards-for-woocommerce' ),
+                'value' => sanitize_text_field( $cart_item['gift_card_type'] ),
             ];
             $item_data[] = [
-                'name'    => __( 'To', 'gift-cards-for-woocommerce' ),
-                'value'   => sanitize_text_field( $cart_item['gift_card_to'] ),
+                'name'  => esc_html__( 'To', 'gift-cards-for-woocommerce' ),
+                'value' => sanitize_text_field( $cart_item['gift_card_to'] ),
             ];
             $item_data[] = [
-                'name'    => __( 'From', 'gift-cards-for-woocommerce' ),
-                'value'   => sanitize_text_field( $cart_item['gift_card_from'] ),
+                'name'  => esc_html__( 'From', 'gift-cards-for-woocommerce' ),
+                'value' => sanitize_text_field( $cart_item['gift_card_from'] ),
             ];
             $item_data[] = [
-                'name'    => __( 'Message', 'gift-cards-for-woocommerce' ),
-                'value'   => sanitize_textarea_field( $cart_item['gift_card_message'] ),
+                'name'  => esc_html__( 'Message', 'gift-cards-for-woocommerce' ),
+                'value' => sanitize_textarea_field( $cart_item['gift_card_message'] ),
             ];
             $item_data[] = [
-                'name'    => __( 'Delivery Date', 'gift-cards-for-woocommerce' ),
-                'value'   => sanitize_text_field( $cart_item['gift_card_delivery_date'] ),
+                'name'  => esc_html__( 'Delivery Date', 'gift-cards-for-woocommerce' ),
+                'value' => sanitize_text_field( $cart_item['gift_card_delivery_date'] ),
             ];
         }
         return $item_data;
@@ -1181,6 +1194,8 @@ class WC_Gift_Cards {
      * @param string $cart_item_key The cart item key.
      * @param array $values The cart item values.
      * @param WC_Order $order The order object.
+     * 
+     * @since  1.0.0
      * @return void
      */
     public function add_gift_card_data_to_order_items( $item, $cart_item_key, $values, $order ) {
@@ -1196,6 +1211,7 @@ class WC_Gift_Cards {
     /**
      * Schedules the daily event for sending gift card emails.
      *
+     * @since  1.0.0
      * @return void
      */
     public function schedule_gift_card_email_event() {
@@ -1211,13 +1227,14 @@ class WC_Gift_Cards {
     /**
      * Sends gift card emails scheduled for today.
      *
+     * @since  1.0.0
      * @return void
      */
     public function send_scheduled_gift_card_emails() {
         global $wpdb;
         $table_name = $wpdb->prefix . 'gift_cards';
 
-        // Query for gift cards with today's delivery date
+        // Query for gift cards with today's delivery date.
         $today = current_time( 'Y-m-d' );
         $gift_cards = $wpdb->get_results( $wpdb->prepare(
             "SELECT * FROM $table_name WHERE delivery_date = %s AND gift_card_type = %s",
@@ -1233,6 +1250,8 @@ class WC_Gift_Cards {
      * Sends a single gift card email.
      *
      * @param object $gift_card The gift card data.
+     * 
+     * @since  1.0.0
      * @return void
      */
     private function send_gift_card_email( $gift_card ) {
@@ -1246,6 +1265,7 @@ class WC_Gift_Cards {
     /**
      * Sends reminder emails for gift cards that are about to expire.
      *
+     * @since  1.0.0
      * @return void
      */
     public function send_gift_card_expiry_reminder_emails() {
@@ -1279,6 +1299,8 @@ class WC_Gift_Cards {
      * Sends a reminder email that a gift card is about to expire.
      *
      * @param object $gift_card The gift card data.
+     * 
+     * @since  1.0.0
      * @return void
      */
     private function send_gift_card_expiry_reminder_email( $gift_card ) {
@@ -1293,6 +1315,8 @@ class WC_Gift_Cards {
      * Generates gift card variations when the product is marked as a gift card.
      *
      * @param int $post_id The ID of the product post.
+     * 
+     * @since  1.0.0
      * @return void
      */
     public function generate_gift_card_variations( $post_id ) {
@@ -1302,8 +1326,6 @@ class WC_Gift_Cards {
 
             // Only proceed if the product is variable.
             if ( $product->is_type( 'variable' ) ) {
-                $attribute_name = 'Gift Card Amount';
-
                 // Set up the attribute for "Gift Card Amount" if not present.
                 $attributes = $product->get_attributes();
                 if ( ! isset( $attributes['gift_card_amount'] ) ) {
@@ -1387,13 +1409,14 @@ class WC_Gift_Cards {
      * @return array
      */
     public function add_my_account_tab( $items ) {
-        // Add the new endpoint after 'dashboard' or wherever you want
+        // Create empty array.
         $new_items = [];
 
+        // Loop through items.
         foreach ( $items as $key => $value ) {
             $new_items[ $key ] = $value;
             if ( 'dashboard' === $key ) {
-                $new_items['gift-cards'] = __( 'Gift Cards', 'gift-cards-for-woocommerce' );
+                $new_items['gift-cards'] = esc_html__( 'Gift Cards', 'gift-cards-for-woocommerce' );
             }
         }
 
@@ -1620,11 +1643,11 @@ class WC_Gift_Cards {
      */
     public function export_gift_cards_csv() {
         if ( ! current_user_can( 'manage_woocommerce' ) ) {
-            wp_die( __( 'You do not have permission to export gift cards.', 'gift-cards-for-woocommerce' ), '', [ 'response' => 403 ] );
+            wp_die( esc_html__( 'You do not have permission to export gift cards.', 'gift-cards-for-woocommerce' ), '', [ 'response' => 403 ] );
         }
 
         if ( ! check_admin_referer( 'export_gift_cards' ) ) {
-            wp_die( __( 'Invalid request.', 'gift-cards-for-woocommerce' ), '', [ 'response' => 403 ] );
+            wp_die( esc_html__( 'Invalid request.', 'gift-cards-for-woocommerce' ), '', [ 'response' => 403 ] );
         }
 
         global $wpdb;
@@ -1642,10 +1665,10 @@ class WC_Gift_Cards {
         header( 'Content-Type: text/csv; charset=utf-8' );
         header( 'Content-Disposition: attachment; filename=gift-cards-' . current_time( 'Y-m-d' ) . '.csv' );
 
-        // Open the output stream
+        // Open the output stream.
         $output = fopen( 'php://output', 'w' );
 
-        // Define the column headings with translations
+        // Define the column headings with translations.
         $headers = array(
             'id'              => __( 'ID', 'gift-cards-for-woocommerce' ),
             'code'            => __( 'Code', 'gift-cards-for-woocommerce' ),
@@ -1660,7 +1683,7 @@ class WC_Gift_Cards {
             'user_id'         => __( 'User ID', 'gift-cards-for-woocommerce' ),
         );
 
-        // Output the column headings
+        // Output the column headings.
         fputcsv( $output, $headers );
 
         // Loop over the rows and output them.
@@ -1685,18 +1708,19 @@ class WC_Gift_Cards {
      * Parses each row in the CSV, sanitizes data, and inserts it into the database.
      * Redirects to the admin page with success or failure messages based on import results.
      *
+     * @since  1.0.0
      * @return void
      */
     public function handle_import_action() {
-        // Verify file upload and nonce
+        // Verify file upload and nonce.
         if ( isset( $_FILES['gift_card_csv'] ) && check_admin_referer( 'import_gift_cards', 'import_gift_cards_nonce' ) ) {
 
-            // Ensure the user has the right permissions
+            // Ensure the user has the right permissions.
             if ( ! current_user_can( 'manage_woocommerce' ) ) {
                 wp_die( esc_html__( 'You do not have permission to import gift cards.', 'gift-cards-for-woocommerce' ), '', [ 'response' => 403 ] );
             }
 
-            // Check that the file is not empty
+            // Check that the file is not empty.
             if ( ! empty( $_FILES['gift_card_csv']['tmp_name'] ) ) {
                 $file   = $_FILES['gift_card_csv']['tmp_name'];
                 $handle = fopen( $file, 'r' );
@@ -1707,7 +1731,8 @@ class WC_Gift_Cards {
                     global $wpdb;
                     $table_name = $wpdb->prefix . 'gift_cards';
 
-                    fgetcsv( $handle, 1000, ',' ); // Skip header
+                    // Skip header.
+                    fgetcsv( $handle, 1000, ',' );
 
                     while ( ( $data = fgetcsv( $handle, 1000, ',' ) ) !== false ) {
                         $result = $wpdb->insert(
@@ -1797,19 +1822,20 @@ class WC_Gift_Cards {
      * It checks permissions, verifies the nonce, sanitizes the code, and formats
      * the gift card data for use in the edit form.
      *
+     * @since  1.0.0
      * @return void Outputs JSON response with gift card data or error message.
      */
     public function get_gift_card_data_ajax() {
         check_ajax_referer( 'edit_gift_card_nonce', 'nonce' );
 
         if ( ! current_user_can( 'manage_woocommerce' ) ) {
-            wp_send_json_error( __( 'You do not have permission to perform this action.', 'gift-cards-for-woocommerce' ) );
+            wp_send_json_error( esc_html__( 'You do not have permission to perform this action.', 'gift-cards-for-woocommerce' ) );
         }
 
         $code = isset( $_POST['code'] ) ? sanitize_text_field( $_POST['code'] ) : '';
 
         if ( empty( $code ) ) {
-            wp_send_json_error( __( 'Invalid gift card code.', 'gift-cards-for-woocommerce' ) );
+            wp_send_json_error( esc_html__( 'Invalid gift card code.', 'gift-cards-for-woocommerce' ) );
         }
 
         global $wpdb;
@@ -1824,7 +1850,7 @@ class WC_Gift_Cards {
 
             wp_send_json_success( $gift_card );
         } else {
-            wp_send_json_error( __( 'Gift card not found.', 'gift-cards-for-woocommerce' ) );
+            wp_send_json_error( esc_html__( 'Gift card not found.', 'gift-cards-for-woocommerce' ) );
         }
     }
 
@@ -1943,20 +1969,20 @@ class WC_Gift_Cards {
         global $wpdb;
         $table_name = $wpdb->prefix . 'gift_cards';
 
-        // Retrieve a batch of gift card records
+        // Retrieve a batch of gift card records.
         $gift_cards = $wpdb->get_results( $wpdb->prepare(
             "SELECT * FROM $table_name LIMIT %d OFFSET %d",
             $batch_size,
             $offset
         ), ARRAY_A );
 
-        // Define CSV file path
+        // Define CSV file path.
         $file_path = wp_upload_dir()['basedir'] . '/gift-cards-export.csv';
         $file = fopen( $file_path, $offset === 0 ? 'w' : 'a' );
 
-        // Write gift card data to CSV
+        // Write gift card data to CSV.
         if ( $offset === 0 ) {
-            fputcsv( $file, array_keys( $gift_cards[0] ) ); // Header row
+            fputcsv( $file, array_keys( $gift_cards[0] ) );
         }
 
         foreach ( $gift_cards as $gift_card ) {
@@ -1964,7 +1990,7 @@ class WC_Gift_Cards {
         }
         fclose( $file );
 
-        // If this is the last batch, return completion status
+        // If this is the last batch, return completion status.
         if ( count( $gift_cards ) < $batch_size ) {
             wp_send_json_success( [ 'complete' => true, 'file_url' => wp_upload_dir()['baseurl'] . '/gift-cards-export.csv' ] );
         } else {
@@ -1975,6 +2001,7 @@ class WC_Gift_Cards {
     /**
      * Imports gift card data from a CSV file in batches.
      *
+     * @since  1.0.0
      * @return void Outputs JSON response indicating batch progress or completion.
      */
     public function import_gift_cards_in_batches() {
@@ -1984,15 +2011,15 @@ class WC_Gift_Cards {
         $batch_size = isset( $_POST['batch_size'] ) ? intval( $_POST['batch_size'] ) : 100;
 
         if ( ! isset( $_FILES['file'] ) || ! is_uploaded_file( $_FILES['file']['tmp_name'] ) ) {
-            wp_send_json_error( [ 'error' => __( 'File upload error.', 'gift-cards-for-woocommerce' ) ] );
+            wp_send_json_error( [ 'error' => esc_html__( 'File upload error.', 'gift-cards-for-woocommerce' ) ] );
         }
 
         $file = fopen( $_FILES['file']['tmp_name'], 'r' );
         if ( $file === false ) {
-            wp_send_json_error( [ 'error' => __( 'Cannot open uploaded file.', 'gift-cards-for-woocommerce' ) ] );
+            wp_send_json_error( [ 'error' => esc_html__( 'Cannot open uploaded file.', 'gift-cards-for-woocommerce' ) ] );
         }
 
-        // Skip headers and previous rows
+        // Skip headers and previous rows.
         if ( $offset > 0 ) {
             for ( $i = 0; $i < $offset + 1; $i++ ) {
                 fgetcsv( $file );
@@ -2000,7 +2027,7 @@ class WC_Gift_Cards {
         }
 
         global $wpdb;
-        $table_name = $wpdb->prefix . 'gift_cards';
+        $table_name    = $wpdb->prefix . 'gift_cards';
         $rows_imported = 0;
 
         while ( ( $data = fgetcsv( $file ) ) !== false && $rows_imported < $batch_size ) {
@@ -2025,7 +2052,7 @@ class WC_Gift_Cards {
 
         fclose( $file );
 
-        // Return completion status
+        // Return completion status.
         if ( $rows_imported < $batch_size ) {
             wp_send_json_success( [ 'complete' => true ] );
         } else {
@@ -2040,8 +2067,11 @@ class WC_Gift_Cards {
      * @param string $code        The gift card code.
      * @param float  $amount      The amount associated with the action.
      * @param int    $user_id     The user ID related to the action.
+     * 
+     * @since  1.0.0
+     * @return void
      */
-    private function log_activity($action_type, $code, $amount = null, $user_id = null) {
+    private function log_activity( $action_type, $code, $amount = null, $user_id = null ) {
         global $wpdb;
         $table_name = $wpdb->prefix . 'gift_card_activities';
 
@@ -2064,9 +2094,12 @@ class WC_Gift_Cards {
      * @param string $code        The code of the created gift card.
      * @param float  $balance     The initial balance of the gift card.
      * @param int    $user_id     The user ID associated with the card.
+     * 
+     * @since  1.0.0
+     * @return void
      */
-    private function log_creation($code, $balance, $user_id = null) {
-        $this->log_activity('created', $code, $balance, $user_id);
+    private function log_creation( $code, $balance, $user_id = null ) {
+        $this->log_activity( 'created', $code, $balance, $user_id );
     }
 
     /**
@@ -2075,9 +2108,12 @@ class WC_Gift_Cards {
      * @param string $code        The code of the used gift card.
      * @param float  $amount_used The amount used.
      * @param int    $user_id     The user ID who used the gift card.
+     * 
+     * @since  1.0.0
+     * @return void
      */
-    private function log_usage($code, $amount_used, $user_id = null) {
-        $this->log_activity('used', $code, $amount_used, $user_id);
+    private function log_usage( $code, $amount_used, $user_id = null ) {
+        $this->log_activity( 'used', $code, $amount_used, $user_id );
     }
 
     /**
@@ -2086,6 +2122,9 @@ class WC_Gift_Cards {
      * @param string $code        The code of the adjusted gift card.
      * @param float  $new_balance The new balance after adjustment.
      * @param int    $user_id     The ID of the admin making the adjustment.
+     * 
+     * @since  1.0.0
+     * @return void
      */
     private function log_balance_adjustment( $code, $new_balance, $user_id ) {
         $this->log_activity( 'balance_adjusted', $code, $new_balance, $user_id );
@@ -2097,6 +2136,9 @@ class WC_Gift_Cards {
      * @param string $code            The code of the gift card with updated expiration.
      * @param string $expiration_date The new expiration date.
      * @param int    $user_id         The ID of the admin making the update.
+     * 
+     * @since  1.0.0
+     * @return void
      */
     private function log_expiration_update( $code, $expiration_date, $user_id ) {
         $this->log_activity( 'expiration_updated', $code, null, $user_id );
@@ -2107,6 +2149,9 @@ class WC_Gift_Cards {
      *
      * @param string $code    The code of the deleted gift card.
      * @param int    $user_id The ID of the admin who deleted the card.
+     * 
+     * @since  1.0.0
+     * @return void
      */
     private function log_deletion( $code, $user_id ) {
         $this->log_activity( 'deleted', $code, null, $user_id );
@@ -2117,6 +2162,9 @@ class WC_Gift_Cards {
      *
      * @param string $code    The code of the gift card.
      * @param int    $user_id The ID of the recipient user.
+     * 
+     * @since  1.0.0
+     * @return void
      */
     private function log_expiration_reminder_sent( $code, $user_id ) {
         $this->log_activity( 'expiration_reminder_sent', $code, null, $user_id );
@@ -2128,6 +2176,9 @@ class WC_Gift_Cards {
      * @param string $action_type Action type: 'import' or 'export'.
      * @param int    $user_id     The admin ID who initiated the action.
      * @param int    $count       The number of cards processed.
+     * 
+     * @since  1.0.0
+     * @return void
      */
     private function log_import_export( $action_type, $user_id, $count ) {
         $this->log_activity( $action_type . '_csv', null, $count, $user_id );
@@ -2136,28 +2187,28 @@ class WC_Gift_Cards {
     /**
      * Clears all cached gift cards list table transients.
      *
+     * @since  1.0.0
      * @return void
      */
     private function clear_gift_cards_list_cache() {
         global $wpdb;
 
-        // Retrieve all option names that start with '_transient_gift_cards_list_'
+        // Retrieve all option names that start with '_transient_gift_cards_list_'.
         $transient_names = $wpdb->get_col( "
             SELECT option_name FROM {$wpdb->options}
             WHERE option_name LIKE '\\_transient\\_gift_cards_list\\_%'
         " );
 
-        // Loop through each transient and delete it
+        // Loop through each transient and delete it.
         foreach ( $transient_names as $transient ) {
-            // Remove the '_transient_' prefix to get the actual transient name
+            // Remove the '_transient_' prefix to get the actual transient name.
             $transient_clean = str_replace( '_transient_', '', $transient );
             delete_transient( $transient_clean );
         }
 
-        // Additionally, delete the total count transient if it exists
+        // Additionally, delete the total count transient if it exists.
         delete_transient( 'gift_cards_total_count' );
     }
-
 
 }
 
