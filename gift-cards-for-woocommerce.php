@@ -11,7 +11,7 @@
  * Plugin Name: Gift Cards for WooCommerce®
  * Description: Adds gift card functionality to your WooCommerce® store.
  * Plugin URI:  https://github.com/robertdevore/gift-cards-for-woocommerce/
- * Version:     1.0.0
+ * Version:     1.0.1
  * Author:      Robert DeVore
  * Author URI:  https://robertdevore.com/
  * License:     GPL-2.0+
@@ -39,7 +39,7 @@ use GiftCards\WooCommerce\Emails\WC_Gift_Card_Expiry_Reminder_Email;
 /**
  * Current plugin version.
  */
-define( 'GIFT_CARDS_FOR_WOOCOMMERCE_VERSION', '1.0.0' );
+define( 'GIFT_CARDS_FOR_WOOCOMMERCE_VERSION', '1.0.1' );
 
 /**
  * Displays an admin notice if WooCommerce is inactive.
