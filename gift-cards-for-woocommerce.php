@@ -158,6 +158,9 @@ class WC_Gift_Cards {
         // AJAX actions for editing gift cards.
         add_action( 'wp_ajax_get_gift_card_data', [ $this, 'get_gift_card_data_ajax' ] );
         add_action( 'wp_ajax_update_gift_card', [ $this, 'update_gift_card_ajax' ] );
+
+        // Handle user registration
+        add_action( 'user_register', [ $this, 'associate_gift_cards_with_user' ] );
     }
 
     /**
@@ -1951,6 +1954,54 @@ class WC_Gift_Cards {
         } else {
             // Send an error response if the update failed.
             wp_send_json_error( esc_html__( 'Failed to update gift card.', 'gift-cards-for-woocommerce' ) );
+        }
+    }
+
+    /**
+     * Associates any existing gift cards with a newly registered user.
+     * 
+     * This function is triggered when a new user registers. It checks for any gift cards
+     * that were issued to the user's email address before they registered and associates
+     * them with their new user account.
+     *
+     * @param int $user_id The ID of the newly registered user.
+     *
+     * @since  1.0.1
+     * @return void
+     */
+    public function associate_gift_cards_with_user( $user_id ) {
+        global $wpdb;
+
+        // Get the user's email
+        $user = get_userdata( $user_id );
+        if ( ! $user || ! $user->user_email ) {
+            return;
+        }
+
+        $table_name = $wpdb->prefix . 'gift_cards';
+
+        // Find gift cards issued to this email
+        $gift_cards = $wpdb->get_results(
+            $wpdb->prepare(
+                "SELECT * FROM {$table_name} WHERE recipient_email = %s AND user_id IS NULL",
+                $user->user_email
+            )
+        );
+
+        if ( ! empty( $gift_cards ) ) {
+            foreach ( $gift_cards as $gift_card ) {
+                // Update the user_id for each gift card
+                $wpdb->update(
+                    $table_name,
+                    array( 'user_id' => $user_id ),
+                    array( 'id' => $gift_card->id ),
+                    array( '%d' ),
+                    array( '%d' )
+                );
+
+                // Log the association
+                $this->log_activity( 'associated_with_user', $gift_card->code, null, $user_id );
+            }
         }
     }
 
